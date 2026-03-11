@@ -83,11 +83,11 @@
     - **Property 14: 模板自定义往返一致性**
     - **Validates: Requirements 1.4, 10.5**
 
-- [-] 6. 检查点 - 确保项目管理和文本输入功能完整
+- [x] 6. 检查点 - 确保项目管理和文本输入功能完整
   - 确保所有测试通过，如有问题请询问用户
 
 - [ ] 7. 实现 LLM 服务（角色提取 + 分镜生成）
-  - [~] 7.1 实现 LLM 服务核心
+  - [-] 7.1 实现 LLM 服务核心
     - 实现 LLMService 类，支持 OpenAI 兼容 API
     - 实现角色提取功能（extract_characters），包含结构化 prompt 模板
     - 实现分镜脚本生成功能（generate_storyboard），包含结构化 prompt 模板
