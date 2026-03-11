@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "outDir": "./out/renderer",
+    "rootDir": "./src",
+    "strict": true,
+    "skipLibCheck": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "types": ["vitest/globals"]
+  },
+  "include": ["src/renderer/**/*", "src/preload/**/*"]
+}

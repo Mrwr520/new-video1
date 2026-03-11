@@ -1,0 +1,4 @@
+# file: C:\Users\Administrator\Desktop\erciyuan\backend\app\api\templates.py
+# hypothesis_version: 6.151.9
+
+[201, 404, '/api/templates', '/{template_id}', 'templates', '模板不存在']

@@ -1,0 +1,4 @@
+# file: C:\Users\Administrator\Desktop\erciyuan\backend\app\models\template.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.5, 1.0, 5.0, 7.5, 100, 576, 1024, '#000000AA', '#FFFFFF', 'TTS 引擎', 'bottom', 'edge-tts', 'fade', 'zh-CN-XiaoxiaoNeural', '分镜生成 prompt', '图像宽度', '图像风格参数', '图像高度', '字体大小', '字体颜色', '字幕样式', '帧率', '引导系数', '模板名称', '模板类型', '片段时长（秒）', '背景颜色', '角色提取 prompt', '语速', '语音配置', '负面提示词', '转场类型', '运动幅度 0-1', '运动风格参数', '音调偏移', '额外参数', '风格预设名称', '默认语音']

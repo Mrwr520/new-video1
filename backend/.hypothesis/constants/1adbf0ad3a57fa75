@@ -1,0 +1,4 @@
+# file: C:\Users\Administrator\Desktop\erciyuan\backend\app\api\routes.py
+# hypothesis_version: 6.151.9
+
+['/api', '/health', 'ok', 'status']

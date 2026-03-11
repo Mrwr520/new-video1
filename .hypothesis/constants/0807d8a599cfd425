@@ -1,0 +1,4 @@
+# file: C:\Users\Administrator\Desktop\erciyuan\backend\app\api\projects.py
+# hypothesis_version: 6.151.9
+
+[201, 204, 404, '/api/projects', '/{project_id}', '/{project_id}/text', 'audio', 'created', 'created_at', 'current_step', 'id', 'keyframes', 'metadata.json', 'name', 'output', 'projects', 'r', 'source_text', 'status', 'template_id', 'text_submitted', 'updated_at', 'utf-8', 'videos', 'w', '项目不存在']
