@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\api\config.py
+# hypothesis_version: 6.151.9
+
+[8000, '/api', '/config', 'GPU 设备编号', 'LLM API 地址', 'LLM API 密钥', 'Python 解释器路径', 'TTS 引擎选择', 'chattts', 'config.json', 'edge-tts', 'python', 'utf-8', '后端服务端口', '图像生成 API 地址', '图像生成 API 密钥']

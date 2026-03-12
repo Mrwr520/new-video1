@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\api\events.py
+# hypothesis_version: 6.151.9
+
+[15.0, 404, 409, '/api/projects', '/{project_id}/cancel', '/{project_id}/events', '/{project_id}/start', 'Cache-Control', 'Connection', 'Pipeline 已取消', 'Pipeline 已启动', 'Pipeline 已在运行中', 'X-Accel-Buffering', 'connected', 'current_step', 'error_message', 'estimated_remaining', 'heartbeat', 'is_running', 'keep-alive', 'message', 'no', 'no-cache', 'pipeline', 'pipeline_cancelled', 'pipeline_completed', 'progress', 'project_id', 'status', 'step_detail', 'steps', 'text/event-stream', 'type', 'unknown', '项目不存在']

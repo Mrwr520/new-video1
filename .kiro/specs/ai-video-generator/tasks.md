@@ -175,24 +175,24 @@
     - **Property 10: 视频合成排序与音视频同步正确性**
     - **Property 11: 字幕生成完整性**
     - **Validates: Requirements 7.1, 7.2, 7.3**
-  - [-] 12.3 实现导出 API 和前端
+  - [x] 12.3 实现导出 API 和前端
     - 实现 POST /api/projects/{id}/export
     - 实现前端完整视频预览播放器
     - 实现导出按钮和进度显示
     - _Requirements: 7.4, 7.5, 7.7_
 
 - [ ] 13. 实现 Pipeline 编排引擎和 SSE 事件流
-  - [~] 13.1 实现 Pipeline 状态机
+  - [x] 13.1 实现 Pipeline 状态机
     - 实现 PipelineEngine 类（start/cancel/resume）
     - 实现六个步骤的顺序执行逻辑
     - 实现步骤间的等待用户确认机制（角色确认、分镜确认）
     - 实现每步完成后的自动保存
     - 实现取消时的安全终止和中间结果保存
     - _Requirements: 8.4, 8.6_
-  - [~] 13.2 编写 Pipeline 自动保存属性测试
+  - [x] 13.2 编写 Pipeline 自动保存属性测试
     - **Property 13: Pipeline 步骤完成后自动保存**
     - **Validates: Requirements 8.4**
-  - [~] 13.3 实现 SSE 事件流
+  - [x] 13.3 实现 SSE 事件流
     - 实现 GET /api/projects/{id}/events SSE 端点
     - 推送 Pipeline 各步骤的进度更新
     - 推送错误事件和完成事件
@@ -200,12 +200,12 @@
     - _Requirements: 8.5_
 
 - [ ] 14. 实现设置页面和配置管理
-  - [~] 14.1 实现后端配置 API
+  - [x] 14.1 实现后端配置 API
     - 实现 GET /api/config 和 PUT /api/config
     - 支持 Python 路径、GPU 设备、LLM API 配置、图像 API 配置、TTS 引擎选择
     - 实现配置持久化（JSON 文件）
     - _Requirements: 9.6_
-  - [~] 14.2 实现前端设置页面
+  - [x] 14.2 实现前端设置页面
     - 实现 Python 环境配置表单
     - 实现 GPU 配置选项
     - 实现 LLM API 和图像生成 API 配置表单
@@ -213,18 +213,18 @@
     - _Requirements: 9.6_
 
 - [ ] 15. 全流程集成和端到端联调
-  - [~] 15.1 集成所有服务模块到 Pipeline
+  - [x] 15.1 集成所有服务模块到 Pipeline
     - 将 LLM、图像生成、FramePack、TTS、FFmpeg 服务串联到 Pipeline 引擎
     - 实现前端完整工作流界面（文本输入 → 角色确认 → 分镜确认 → 生成 → 预览 → 导出）
     - 实现资源文件服务（GET /api/projects/{id}/files/{path}）
     - _Requirements: 全部_
-  - [~] 15.2 编写 API 集成测试
+  - [x] 15.2 编写 API 集成测试
     - 测试完整的项目创建到导出流程（使用 mock 服务）
     - 测试错误处理和重试逻辑
     - 测试 Pipeline 取消和恢复
     - _Requirements: 全部_
 
-- [ ] 16. 最终检查点 - 确保所有测试通过
+- [x] 16. 最终检查点 - 确保所有测试通过
   - 确保所有单元测试和属性测试通过
   - 确保前后端联调正常
   - 如有问题请询问用户

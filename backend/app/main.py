@@ -12,6 +12,8 @@ from app.api.characters import router as characters_router
 from app.api.scenes import router as scenes_router
 from app.api.tts import router as tts_router, projects_tts_router
 from app.api.export import router as export_router
+from app.api.events import router as events_router
+from app.api.config import router as config_router
 from app.database import init_db
 
 
@@ -45,3 +47,5 @@ app.include_router(scenes_router)
 app.include_router(tts_router)
 app.include_router(projects_tts_router)
 app.include_router(export_router)
+app.include_router(events_router)
+app.include_router(config_router)

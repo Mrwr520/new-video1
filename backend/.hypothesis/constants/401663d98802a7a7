@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\pipeline\__init__.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 1.0, 120, 300, 'PIPELINE_CANCELLED', 'PIPELINE_ERROR', 'Pipeline 在步骤 %s 前被取消', 'Pipeline 已被取消', 'Pipeline 执行异常: %s', 'Pipeline 未启动', 'cancelled', 'character_extraction', 'completed', 'completed_at', 'composition', 'error', 'error_message', 'failed', 'keyframe_generation', 'paused', 'pending', 'pipeline_cancelled', 'pipeline_completed', 'processing', 'progress', 'project_id', 'running', 'started_at', 'status', 'step', 'step_completed', 'step_description', 'step_failed', 'step_started', 'tts_generation', 'type', 'video_generation', 'waiting_confirmation', '事件回调执行失败: %s', '关键帧图片生成', '分镜脚本生成', '步骤 %s 没有注册执行器，跳过实际执行', '视频合成', '视频片段生成', '角色提取', '语音配音生成']

@@ -112,6 +112,35 @@ export interface GenerateSpeechResponse {
   voice_id: string
 }
 
+// Pipeline 相关类型
+export interface PipelineStatusResponse {
+  current_step: string | null
+  progress: number
+  step_detail: string
+  estimated_remaining: number
+  is_running: boolean
+  is_waiting_confirmation: boolean
+  error_message: string | null
+  steps: Record<string, PipelineStepState>
+}
+
+export interface PipelineStepState {
+  status: string
+  progress: number
+  error_message: string | null
+  started_at: string | null
+  completed_at: string | null
+}
+
+export interface PipelineEvent {
+  type: string
+  project_id: string
+  step?: string
+  step_description?: string
+  progress?: number
+  error?: string
+}
+
 // 导出相关类型
 export interface ExportRequest {
   resolution_width?: number
@@ -131,6 +160,29 @@ export interface ExportErrorDetail {
   message: string
   detail?: string
   retryable: boolean
+}
+
+// 配置相关类型
+export interface AppConfig {
+  python_path: string
+  gpu_device: number
+  backend_port: number
+  llm_api_key: string
+  llm_api_url: string
+  image_gen_api_key: string
+  image_gen_api_url: string
+  tts_engine: 'edge-tts' | 'chattts'
+}
+
+export interface AppConfigUpdate {
+  python_path?: string
+  gpu_device?: number
+  backend_port?: number
+  llm_api_key?: string
+  llm_api_url?: string
+  image_gen_api_key?: string
+  image_gen_api_url?: string
+  tts_engine?: 'edge-tts' | 'chattts'
 }
 
 // API 错误类型
@@ -321,6 +373,48 @@ export class ApiClient {
   /** 获取项目文件 URL */
   getFileUrl(projectId: string, filePath: string): string {
     return `${this.baseUrl}/api/projects/${projectId}/files/${filePath}`
+  }
+
+  /** 启动 Pipeline */
+  async startPipeline(projectId: string): Promise<{ message: string; project_id: string }> {
+    return this.request<{ message: string; project_id: string }>(`/api/projects/${projectId}/start`, {
+      method: 'POST'
+    })
+  }
+
+  /** 取消 Pipeline */
+  async cancelPipeline(projectId: string): Promise<{ message: string; project_id: string }> {
+    return this.request<{ message: string; project_id: string }>(`/api/projects/${projectId}/cancel`, {
+      method: 'POST'
+    })
+  }
+
+  /** 获取 Pipeline 状态 */
+  async getPipelineStatus(projectId: string): Promise<PipelineStatusResponse> {
+    return this.request<PipelineStatusResponse>(`/api/projects/${projectId}/pipeline-status`)
+  }
+
+  /**
+   * 订阅 Pipeline SSE 事件流
+   * Returns an EventSource that emits pipeline progress events.
+   * Caller is responsible for closing the EventSource when done.
+   */
+  subscribePipelineEvents(projectId: string): EventSource {
+    const url = `${this.baseUrl}/api/projects/${projectId}/events`
+    return new EventSource(url)
+  }
+
+  /** 获取应用配置 */
+  async getConfig(): Promise<AppConfig> {
+    return this.request<AppConfig>('/api/config')
+  }
+
+  /** 更新应用配置（支持部分更新） */
+  async updateConfig(data: AppConfigUpdate): Promise<AppConfig> {
+    return this.request<AppConfig>('/api/config', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    })
   }
 }
 

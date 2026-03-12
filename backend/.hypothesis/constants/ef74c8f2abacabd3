@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\pipeline\executors.py
+# hypothesis_version: 6.151.9
+
+[0.0, 5.0, 'appearance', 'audio_path', 'background', 'builtin-anime', 'camera_direction', 'default_voice', 'dialogue', 'duration', 'edge-tts', 'fps', 'gpu_device', 'id', 'image_gen_api_key', 'image_gen_api_url', 'image_prompt', 'keyframe_path', 'llm_api_key', 'llm_api_url', 'motion_prompt', 'name', 'personality', 'projects', 'scene_description', 'scene_order', 'source_text', 'template_id', 'tts_engine', 'video_path', 'zh-CN-XiaoxiaoNeural', '关键帧生成失败: %s', '关键帧生成完成: project=%s', '分镜 %s 没有关键帧，跳过视频生成', '分镜 %s 没有台词，跳过语音生成', '分镜 %s 语音生成失败: %s', '分镜生成失败: %s', '没有已生成的视频片段，无法合成', '视频生成失败: %s', '视频生成完成: project=%s', '角色提取失败: %s', '语音分配失败，使用默认语音: %s', '语音生成完成: project=%s', '项目没有分镜，无法合成视频', '项目没有分镜，无法生成关键帧', '项目没有分镜，无法生成视频', '项目没有分镜，无法生成语音', '项目没有源文本，无法提取角色', '项目没有源文本，无法生成分镜']

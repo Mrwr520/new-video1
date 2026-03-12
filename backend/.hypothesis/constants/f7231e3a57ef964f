@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\api\export.py
+# hypothesis_version: 6.151.9
+
+[0.0, 5.0, 400, 403, 404, 502, 1080, 1920, '.avi', '.jpeg', '.jpg', '.mp3', '.mp4', '.png', '.srt', '.wav', '.webm', '/api/projects', '/{project_id}/export', '8M', 'audio/mpeg', 'audio/wav', 'audio_path', 'code', 'detail', 'dialogue', 'duration', 'export', 'h264', 'image/jpeg', 'image/png', 'message', 'projects', 'retryable', 'text/plain', 'video/mp4', 'video/webm', 'video/x-msvideo', 'video_path', '文件不存在', '无效的文件路径', '没有已生成的视频片段，请先生成视频', '禁止访问该路径', '视频导出成功', '项目不存在', '项目没有分镜，无法导出']
