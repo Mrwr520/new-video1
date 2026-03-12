@@ -86,66 +86,66 @@
 - [x] 6. 检查点 - 确保项目管理和文本输入功能完整
   - 确保所有测试通过，如有问题请询问用户
 
-- [ ] 7. 实现 LLM 服务（角色提取 + 分镜生成）
-  - [-] 7.1 实现 LLM 服务核心
+- [x] 7. 实现 LLM 服务（角色提取 + 分镜生成）
+  - [x] 7.1 实现 LLM 服务核心
     - 实现 LLMService 类，支持 OpenAI 兼容 API
     - 实现角色提取功能（extract_characters），包含结构化 prompt 模板
     - 实现分镜脚本生成功能（generate_storyboard），包含结构化 prompt 模板
     - 实现 LLM 响应解析和错误处理
     - _Requirements: 2.1, 3.1, 3.6_
-  - [~] 7.2 实现角色管理 API 和前端
+  - [x] 7.2 实现角色管理 API 和前端
     - 实现 POST /api/projects/{id}/confirm-characters
     - 实现 PUT /api/projects/{id}/characters/{cid}
     - 实现前端角色列表展示和编辑组件
     - 实现手动添加角色功能（LLM 失败时的降级方案）
     - _Requirements: 2.2, 2.3, 2.4, 2.5_
-  - [~] 7.3 编写角色数据属性测试
+  - [x] 7.3 编写角色数据属性测试
     - **Property 5: 角色数据持久化往返一致性**
     - **Validates: Requirements 2.3, 2.4**
-  - [~] 7.4 实现分镜管理 API 和前端
+  - [x] 7.4 实现分镜管理 API 和前端
     - 实现 POST /api/projects/{id}/confirm-storyboard
     - 实现 PUT /api/projects/{id}/scenes/{sid}
     - 实现 PUT /api/projects/{id}/scenes/reorder
     - 实现前端分镜时间线视图（展示、编辑、拖拽排序）
     - _Requirements: 3.2, 3.3, 3.4, 3.5_
-  - [~] 7.5 编写分镜相关属性测试
+  - [x] 7.5 编写分镜相关属性测试
     - **Property 6: 分镜结构完整性不变量**
     - **Property 7: 分镜更新正确性**
     - **Property 8: 分镜重排序数据保持不变量**
     - **Validates: Requirements 3.2, 3.4, 3.5**
 
 - [ ] 8. 实现图像生成服务
-  - [~] 8.1 实现图像生成服务核心
+  - [x] 8.1 实现图像生成服务核心
     - 实现 ImageGeneratorService 类
     - 支持外部 API 调用（Stable Diffusion API、Flux 等 OpenAI 兼容图像接口）
     - 实现 prompt 构建逻辑（结合场景描述 + 角色外貌 + 模板风格）
     - 实现关键帧图片下载和存储
     - _Requirements: 4.1, 4.2, 4.6_
-  - [~] 8.2 实现关键帧管理 API 和前端
+  - [x] 8.2 实现关键帧管理 API 和前端
     - 实现 POST /api/projects/{id}/scenes/{sid}/regenerate-keyframe
     - 实现前端关键帧展示（在分镜位置显示图片）
     - 实现重新生成按钮和加载状态
     - _Requirements: 4.3, 4.4, 4.5_
 
 - [ ] 9. 实现 FramePack 视频生成引擎
-  - [~] 9.1 实现 FramePack 服务封装
+  - [x] 9.1 实现 FramePack 服务封装
     - 实现 FramePackService 类
     - 集成 FramePack 模型加载/卸载逻辑
     - 实现图片转视频生成功能（支持 prompt、duration、fps 参数）
     - 实现 TeaCache 加速选项
     - 实现 GPU 信息查询
     - _Requirements: 5.1, 5.2, 5.4, 5.6_
-  - [~] 9.2 实现视频片段管理 API 和前端
+  - [x] 9.2 实现视频片段管理 API 和前端
     - 实现 POST /api/projects/{id}/scenes/{sid}/regenerate-video
     - 实现前端视频片段预览播放器
     - 实现重新生成和参数调整界面
     - _Requirements: 5.3, 5.5_
 
-- [~] 10. 检查点 - 确保图像和视频生成功能正常
+- [x] 10. 检查点 - 确保图像和视频生成功能正常
   - 确保所有测试通过，如有问题请询问用户
 
 - [ ] 11. 实现 TTS 语音配音服务
-  - [~] 11.1 实现 TTS 可插拔适配器架构
+  - [x] 11.1 实现 TTS 可插拔适配器架构
     - 实现 TTSAdapter 抽象基类
     - 实现 EdgeTTSAdapter（Edge-TTS 免费引擎）
     - 实现 ChatTTSAdapter（ChatTTS 本地引擎）
@@ -153,18 +153,17 @@
     - 实现 TTSService 管理器（引擎注册、选择、调用）
     - 实现角色语音分配逻辑（不同角色分配不同 voice_id）
     - _Requirements: 6.1, 6.2, 6.4_
-  - [~] 11.2 编写语音分配属性测试
+  - [x] 11.2 编写语音分配属性测试
     - **Property 9: 角色语音分配唯一性**
     - **Validates: Requirements 6.2**
-  - [~] 11.3 实现 TTS 相关 API 和前端
+  - [x] 11.3 实现 TTS 相关 API 和前端
     - 实现语音引擎列表和语音列表 API
     - 实现前端音频预览播放组件
     - 实现语音引擎选择和配置界面
     - _Requirements: 6.3, 6.5, 6.6_
 
-
 - [ ] 12. 实现 FFmpeg 视频合成服务
-  - [~] 12.1 实现 FFmpeg 合成器核心
+  - [x] 12.1 实现 FFmpeg 合成器核心
     - 实现 FFmpegCompositor 类
     - 实现视频片段按顺序拼接功能
     - 实现音视频同步合成功能
@@ -172,11 +171,11 @@
     - 实现转场效果（fade 等）
     - 实现 MP4 导出（1080p、h264 编码）
     - _Requirements: 7.1, 7.2, 7.3, 7.5, 7.6_
-  - [~] 12.2 编写合成相关属性测试
+  - [x] 12.2 编写合成相关属性测试
     - **Property 10: 视频合成排序与音视频同步正确性**
     - **Property 11: 字幕生成完整性**
     - **Validates: Requirements 7.1, 7.2, 7.3**
-  - [~] 12.3 实现导出 API 和前端
+  - [-] 12.3 实现导出 API 和前端
     - 实现 POST /api/projects/{id}/export
     - 实现前端完整视频预览播放器
     - 实现导出按钮和进度显示
@@ -225,7 +224,7 @@
     - 测试 Pipeline 取消和恢复
     - _Requirements: 全部_
 
-- [~] 16. 最终检查点 - 确保所有测试通过
+- [ ] 16. 最终检查点 - 确保所有测试通过
   - 确保所有单元测试和属性测试通过
   - 确保前后端联调正常
   - 如有问题请询问用户

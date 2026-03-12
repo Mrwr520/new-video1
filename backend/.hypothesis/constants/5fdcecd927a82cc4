@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\services\ffmpeg_service.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.5, 5.0, 1000, 1080, 1920, 3600, '-b:a', '-b:v', '-c:a', '-c:v', '-filter_complex', '-i', '-map', '-of', '-pix_fmt', '-r', '-shortest', '-show_entries', '-v', '-vf', '-y', '/', '192k', '8M', ':', ';', 'FFMPEG_ERROR', 'FFMPEG_NOT_FOUND', '[outa]', '[outv]', '\\', '\\:', 'aac', 'composed_raw.mp4', 'copy', 'error', 'fade', 'ffmpeg', 'ffprobe', 'final.mp4', 'format=duration', 'h264', 'libx264', 'mp4', 'output', 'projects', 'replace', 'subtitles.srt', 'utf-8', 'w', 'yuv420p', '合成场景列表不能为空', '执行 FFmpeg 命令: %s', '视频合成失败', '视频合成完成: %s', '视频片段列表不能为空']

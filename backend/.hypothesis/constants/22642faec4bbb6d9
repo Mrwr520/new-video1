@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\api\characters.py
+# hypothesis_version: 6.151.9
+
+[200, 201, 204, 400, 404, ', ', '/api/projects', 'appearance', 'background', 'characters', 'cnt', 'count', 'id', 'image_prompt', 'message', 'name', 'personality', '未命名角色', '没有角色可确认', '角色不存在', '角色已确认', '项目不存在']

@@ -8,6 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.api.projects import router as projects_router
 from app.api.templates import router as templates_router
+from app.api.characters import router as characters_router
+from app.api.scenes import router as scenes_router
+from app.api.tts import router as tts_router, projects_tts_router
+from app.api.export import router as export_router
 from app.database import init_db
 
 
@@ -36,3 +40,8 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(projects_router)
 app.include_router(templates_router)
+app.include_router(characters_router)
+app.include_router(scenes_router)
+app.include_router(tts_router)
+app.include_router(projects_tts_router)
+app.include_router(export_router)

@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\services\image_service.py
+# hypothesis_version: 6.151.9
+
+[120.0, 200, 429, 500, 576, 1024, ',', ', ', '/', 'Authorization', 'Content-Type', 'IMAGE_GEN_API_ERROR', 'IMAGE_GEN_FAILED', 'IMAGE_GEN_TIMEOUT', 'application/json', 'b64_json', 'dall-e-3', 'data', 'data:', 'default', 'extra', 'height', 'keyframes', 'model', 'n', 'negative_prompt', 'projects', 'prompt', 'size', 'style_keywords', 'style_preset', 'url', 'width', '下载图片超时', '图像 API 响应中没有 data', '图像 API 调用失败，已耗尽重试次数', '图像 API 超时 (尝试 %d/%d)', '图像生成 API 请求超时']

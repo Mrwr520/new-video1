@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\models\scene.py
+# hypothesis_version: 6.151.9
+
+['FramePack 运动 prompt', '关键帧图片路径', '台词/旁白', '图像生成 prompt', '场景唯一标识', '场景描述', '场景顺序', '视频片段路径', '运动 prompt', '镜头指示']

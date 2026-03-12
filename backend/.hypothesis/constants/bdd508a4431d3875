@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\services\framepack_service.py
+# hypothesis_version: 6.151.9
+
+[5.0, 7.0, 1024, 'FRAMEPACK_ERROR', 'FRAMEPACK_LOAD_ERROR', 'FRAMEPACK_NOT_LOADED', 'FRAMEPACK_OOM', 'FramePack 模型加载失败', 'FramePack 模型已卸载', 'PyTorch 未安装', 'RGB', 'allocated_memory_gb', 'available', 'compute_capability', 'cuda_available', 'cuda_version', 'current_device', 'device_count', 'devices', 'duration 必须大于 0', 'error', 'fps 必须大于 0', 'framepack_available', 'free_memory_gb', 'guidance_scale', 'image', 'index', 'model_loaded', 'name', 'num_frames', 'num_inference_steps', 'oom', 'out of memory', 'projects', 'prompt', 'reserved_memory_gb', 'tencent/HunyuanVideo', 'torch (PyTorch)', 'torch_available', 'total_memory_gb', 'unknown', 'videos', '卸载模型时出错: %s', '视频生成失败']

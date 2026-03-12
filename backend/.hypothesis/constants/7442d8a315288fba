@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\api\scenes.py
+# hypothesis_version: 6.151.9
+
+[200, 201, 204, 400, 404, 502, ', ', '/api/projects', '/{project_id}/scenes', 'appearance', 'background', 'camera_direction', 'cnt', 'code', 'count', 'dialogue', 'id', 'image_prompt', 'image_style', 'keyframe_path', 'max_order', 'message', 'motion_prompt', 'name', 'personality', 'retryable', 'scene_description', 'scene_order', 'scenes', 'template_id', '关键帧重新生成失败: %s', '分镜 ID 列表与项目不匹配', '分镜不存在', '分镜已确认', '没有分镜可确认', '项目不存在']

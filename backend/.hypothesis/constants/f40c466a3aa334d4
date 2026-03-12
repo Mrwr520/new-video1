@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\api\tts.py
+# hypothesis_version: 6.151.9
+
+[400, 404, 502, '/api/projects', '/api/tts', '/engines', 'code', 'dialogue', 'edge-tts', 'message', 'retryable', 'tts', 'zh-CN-XiaoxiaoNeural', '分镜不存在', '该分镜没有台词/旁白文本，无法生成语音', '语音生成失败: %s', '项目不存在']

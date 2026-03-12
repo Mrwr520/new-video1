@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\models\character.py
+# hypothesis_version: 6.151.9
+
+['图像生成 prompt', '外貌描述', '性格特征', '用于图像生成的 prompt', '背景信息', '角色名称', '角色唯一标识']

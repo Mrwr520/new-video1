@@ -1,0 +1,4 @@
+# file: D:\Desktop\aivideo\new-video1\backend\app\services\llm_service.py
+# hypothesis_version: 6.151.9
+
+[0.7, 120.0, 200, 429, 500, '/', 'Authorization', 'Content-Type', 'LLM API 请求超时', 'LLM API 调用失败，已耗尽重试次数', 'LLM 响应中没有 choices', 'LLM 响应内容为空', 'LLM_API_ERROR', 'LLM_ERROR', 'LLM_PARSE_ERROR', 'LLM_TIMEOUT', '[', ']', '```', 'appearance', 'application/json', 'background', 'camera_direction', 'characters', 'choices', 'content', 'data', 'dialogue', 'gpt-4o-mini', 'image_prompt', 'json', 'message', 'messages', 'model', 'motion_prompt', 'name', 'personality', 'result', 'role', 'roles', 'scene_description', 'scenes', 'storyboard', 'system', 'temperature', 'user', '{', '}', '未知角色']

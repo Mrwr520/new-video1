@@ -17,6 +17,9 @@ class StoryboardScene(BaseModel):
     camera_direction: str = Field(..., description="镜头指示")
     image_prompt: str = Field("", description="图像生成 prompt")
     motion_prompt: str = Field("", description="FramePack 运动 prompt")
+    keyframe_path: Optional[str] = Field(None, description="关键帧图片路径")
+    video_path: Optional[str] = Field(None, description="视频片段路径")
+    audio_path: Optional[str] = Field(None, description="语音音频路径")
 
 
 class SceneUpdate(BaseModel):
