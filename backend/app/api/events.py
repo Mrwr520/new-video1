@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.database import get_connection
+from app.database import get_connection
 from app.pipeline import (
     PipelineEngine,
     PipelineAlreadyRunningError,
@@ -182,12 +183,76 @@ async def cancel_pipeline(project_id: str):
 
 @router.get("/{project_id}/pipeline-status")
 async def get_pipeline_status(project_id: str):
-    """获取当前 Pipeline 状态。"""
+    """获取当前 Pipeline 状态。
+
+    如果 engine 内存中没有状态（重启后），从数据库恢复。
+    """
     await _check_project_exists(project_id)
     engine = get_engine()
 
     status = engine.get_status(project_id)
     step_states = await load_step_states(project_id)
+
+    # 如果 engine 内存中没有状态，从数据库恢复
+    if status.current_step is None and step_states:
+        # 旧版确认值到对应 PipelineStep 值的映射
+        CONFIRMED_STEP_MAP = {
+            "characters_confirmed": "character_extraction",
+            "storyboard_confirmed": "storyboard_generation",
+        }
+
+        conn = await get_connection()
+        try:
+            cursor = await conn.execute(
+                "SELECT status, current_step FROM projects WHERE id = ?", (project_id,)
+            )
+            row = await cursor.fetchone()
+            if row and row[1]:
+                db_status = row[0]
+                db_step = row[1]
+
+                # 兼容旧版 'characters_confirmed' / 'storyboard_confirmed' 值
+                is_confirmed_legacy = db_step in CONFIRMED_STEP_MAP
+                if is_confirmed_legacy:
+                    db_step = CONFIRMED_STEP_MAP[db_step]
+
+                # 计算进度
+                step_keys = [s.value for s in STEP_ORDER]
+                if db_step in step_keys:
+                    step_idx = step_keys.index(db_step)
+                    is_waiting = (
+                        (db_status == "paused" or is_confirmed_legacy)
+                        and db_step in ("character_extraction", "storyboard_generation")
+                    )
+                    # 等待确认说明该步骤执行已完成，进度应算到 (step_idx+1)
+                    # 正常运行中的步骤进度算到 step_idx（即该步骤刚开始）
+                    if is_waiting:
+                        progress = (step_idx + 1) / len(STEP_ORDER)
+                    else:
+                        progress = step_idx / len(STEP_ORDER)
+                    step_desc_map = {
+                        "character_extraction": "角色提取",
+                        "storyboard_generation": "分镜脚本生成",
+                        "keyframe_generation": "关键帧图片生成",
+                        "video_generation": "视频片段生成",
+                        "tts_generation": "语音配音生成",
+                        "composition": "视频合成",
+                    }
+                    step_desc = step_desc_map.get(db_step, db_step)
+                    detail = f"{step_desc} - 等待用户确认" if is_waiting else step_desc
+
+                    return {
+                        "current_step": db_step,
+                        "progress": progress,
+                        "step_detail": detail,
+                        "estimated_remaining": 0,
+                        "is_running": False,
+                        "is_waiting_confirmation": is_waiting,
+                        "error_message": None,
+                        "steps": step_states,
+                    }
+        finally:
+            await conn.close()
 
     return {
         "current_step": status.current_step.value if status.current_step else None,

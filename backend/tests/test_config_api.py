@@ -19,6 +19,12 @@ async def test_get_config_returns_defaults(client):
     assert data["image_gen_api_key"] == ""
     assert data["image_gen_api_url"] == ""
     assert data["tts_engine"] == "edge-tts"
+    assert data["fish_audio_api_key"] == ""
+    assert data["cosyvoice_api_key"] == ""
+    assert data["minimax_api_key"] == ""
+    assert data["minimax_group_id"] == ""
+    assert data["volcengine_access_token"] == ""
+    assert data["volcengine_app_id"] == ""
 
 
 @pytest.mark.asyncio
@@ -66,10 +72,12 @@ async def test_put_config_partial_update(client):
 
 
 @pytest.mark.asyncio
-async def test_put_config_invalid_tts_engine(client):
-    """PUT /api/config 使用无效的 tts_engine 应返回 422"""
-    response = await client.put("/api/config", json={"tts_engine": "invalid"})
-    assert response.status_code == 422
+async def test_put_config_tts_engine_accepts_paid_engines(client):
+    """PUT /api/config 支持收费 TTS 引擎名称"""
+    for engine in ["edge-tts", "chattts", "fish-speech", "cosyvoice", "minimax-tts", "volcengine-tts"]:
+        response = await client.put("/api/config", json={"tts_engine": engine})
+        assert response.status_code == 200
+        assert response.json()["tts_engine"] == engine
 
 
 @pytest.mark.asyncio

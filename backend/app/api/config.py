@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -19,11 +19,21 @@ class AppConfig(BaseModel):
     backend_port: int = Field(default=8000, description="后端服务端口")
     llm_api_key: str = Field(default="", description="LLM API 密钥")
     llm_api_url: str = Field(default="", description="LLM API 地址")
+    image_gen_mode: str = Field(
+        default="local", description="图像生成模式: local (本地SDXL) 或 api (远程API)"
+    )
     image_gen_api_key: str = Field(default="", description="图像生成 API 密钥")
     image_gen_api_url: str = Field(default="", description="图像生成 API 地址")
-    tts_engine: Literal["edge-tts", "chattts"] = Field(
+    tts_engine: str = Field(
         default="edge-tts", description="TTS 引擎选择"
     )
+    # 收费 TTS 引擎 API Key 配置
+    fish_audio_api_key: str = Field(default="", description="Fish Audio API Key")
+    cosyvoice_api_key: str = Field(default="", description="CosyVoice (阿里 DashScope) API Key")
+    minimax_api_key: str = Field(default="", description="MiniMax API Key")
+    minimax_group_id: str = Field(default="", description="MiniMax Group ID")
+    volcengine_access_token: str = Field(default="", description="火山引擎 Access Token")
+    volcengine_app_id: str = Field(default="", description="火山引擎 App ID")
 
 
 class AppConfigUpdate(BaseModel):
@@ -33,9 +43,16 @@ class AppConfigUpdate(BaseModel):
     backend_port: Optional[int] = None
     llm_api_key: Optional[str] = None
     llm_api_url: Optional[str] = None
+    image_gen_mode: Optional[str] = None
     image_gen_api_key: Optional[str] = None
     image_gen_api_url: Optional[str] = None
-    tts_engine: Optional[Literal["edge-tts", "chattts"]] = None
+    tts_engine: Optional[str] = None
+    fish_audio_api_key: Optional[str] = None
+    cosyvoice_api_key: Optional[str] = None
+    minimax_api_key: Optional[str] = None
+    minimax_group_id: Optional[str] = None
+    volcengine_access_token: Optional[str] = None
+    volcengine_app_id: Optional[str] = None
 
 
 def _get_config_path() -> Path:
@@ -75,4 +92,18 @@ async def update_config(update: AppConfigUpdate) -> AppConfig:
     update_data = update.model_dump(exclude_none=True)
     updated = current.model_copy(update=update_data)
     _save_config(updated)
+
+    # 如果 TTS 相关配置变更，重置 TTS 服务单例
+    tts_fields = {
+        "tts_engine", "fish_audio_api_key", "cosyvoice_api_key",
+        "minimax_api_key", "minimax_group_id",
+        "volcengine_access_token", "volcengine_app_id",
+    }
+    if tts_fields & set(update_data.keys()):
+        try:
+            from app.api.tts import reset_tts_service
+            reset_tts_service()
+        except ImportError:
+            pass
+
     return updated

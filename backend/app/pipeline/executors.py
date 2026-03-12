@@ -129,6 +129,9 @@ async def execute_character_extraction(project_id: str) -> None:
     finally:
         await llm.close()
 
+    if not characters:
+        logger.warning("角色提取结果为空: project=%s，文本可能不包含明确的角色", project_id)
+
     # Save characters to DB
     conn = await get_connection()
     try:
@@ -208,8 +211,14 @@ async def execute_storyboard_generation(project_id: str) -> None:
 # ============================================================
 
 async def execute_keyframe_generation(project_id: str) -> None:
-    """调用 ImageGeneratorService 为每个分镜生成关键帧。"""
+    """调用图像生成服务为每个分镜生成关键帧。
+
+    根据配置 image_gen_mode 选择本地 SDXL 或远程 API。
+    本地模式下，生成完所有关键帧后自动卸载模型释放显存，
+    为后续视频生成腾出 GPU 空间。
+    """
     from app.services.image_service import ImageGeneratorService
+    from app.services.local_image_service import LocalImageGeneratorService
 
     project = await _get_project(project_id)
     template = _get_template(project.get("template_id", "builtin-anime"))
@@ -221,14 +230,27 @@ async def execute_keyframe_generation(project_id: str) -> None:
 
     config = _load_config()
     projects_root = _get_projects_root()
+    image_gen_mode = config.get("image_gen_mode", "local")
 
-    image_service = ImageGeneratorService(
-        api_url=config.get("image_gen_api_url") or "https://api.openai.com/v1",
-        api_key=config.get("image_gen_api_key", ""),
-        projects_dir=projects_root,
-    )
+    # 根据模式选择服务
+    use_local = image_gen_mode == "local"
+    if use_local:
+        image_service = LocalImageGeneratorService(
+            gpu_device=config.get("gpu_device", 0),
+            projects_dir=projects_root,
+        )
+    else:
+        image_service = ImageGeneratorService(
+            api_url=config.get("image_gen_api_url") or "https://api.openai.com/v1",
+            api_key=config.get("image_gen_api_key", ""),
+            projects_dir=projects_root,
+        )
 
     try:
+        # 本地模式需要先加载模型
+        if use_local:
+            await image_service.load_model()
+
         conn = await get_connection()
         try:
             for scene_row in scenes:
@@ -249,7 +271,6 @@ async def execute_keyframe_generation(project_id: str) -> None:
                     project_id=project_id,
                 )
 
-                now = datetime.now(timezone.utc).isoformat()
                 await conn.execute(
                     "UPDATE scenes SET keyframe_path = ? WHERE id = ?",
                     (keyframe_path, scene_row["id"]),
@@ -352,7 +373,7 @@ async def execute_tts_generation(project_id: str) -> None:
     projects_root = _get_projects_root()
     tts_engine = config.get("tts_engine", "edge-tts")
 
-    tts = TTSService(projects_dir=projects_root)
+    tts = TTSService(projects_dir=projects_root, config=config)
 
     # Assign voices to characters
     char_names = [c.name for c in characters]

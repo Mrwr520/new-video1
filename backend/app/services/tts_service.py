@@ -207,26 +207,38 @@ class EdgeTTSAdapter(TTSAdapter):
     async def list_voices(self) -> list[VoiceInfo]:
         """列出 Edge-TTS 可用语音。
 
-        如果 edge-tts 可用，尝试在线获取完整列表；
+        如果 edge-tts 可用，尝试在线获取完整列表（过滤为常用语言）；
         否则返回预定义的常用语音列表。
+        优先显示中文语音，其次英文、日文。
         """
         if not _edge_tts_available:
             return list(self.DEFAULT_VOICES)
+
+        # 只显示这些语言的语音，避免用户选到不支持中文的语音导致生成失败
+        SUPPORTED_LOCALES = {"zh-CN", "zh-TW", "zh-HK", "en-US", "en-GB", "ja-JP", "ko-KR"}
+        # 排序优先级：中文 > 英文 > 日文 > 韩文
+        LOCALE_PRIORITY = {"zh-CN": 0, "zh-TW": 1, "zh-HK": 2, "en-US": 3, "en-GB": 4, "ja-JP": 5, "ko-KR": 6}
 
         try:
             voices_data = await edge_tts.list_voices()
             voices = []
             for v in voices_data:
+                locale = v.get("Locale", "unknown")
+                if locale not in SUPPORTED_LOCALES:
+                    continue
                 voices.append(VoiceInfo(
                     id=v["ShortName"],
                     name=v.get("FriendlyName", v["ShortName"]),
-                    language=v.get("Locale", "unknown"),
+                    language=locale,
                     gender=v.get("Gender", "unknown"),
                 ))
-            return voices
+            # 按语言优先级排序
+            voices.sort(key=lambda v: LOCALE_PRIORITY.get(v.language, 99))
+            if voices:
+                return voices
         except Exception:
             logger.warning("获取 Edge-TTS 在线语音列表失败，使用预定义列表")
-            return list(self.DEFAULT_VOICES)
+        return list(self.DEFAULT_VOICES)
 
     def get_engine_info(self) -> EngineInfo:
         return EngineInfo(
@@ -355,110 +367,436 @@ class ChatTTSAdapter(TTSAdapter):
 # ============================================================
 
 class FishSpeechAdapter(TTSAdapter):
-    """Fish Speech 适配器（收费，高质量中文语音）。
+    """Fish Audio 适配器（收费，高质量多语言语音合成 + 语音克隆）。
 
-    预留骨架，后续迭代开发。
+    API 文档: https://docs.fish.audio
+    - POST https://api.fish.audio/v1/tts  (TTS 合成)
+    - GET  https://api.fish.audio/model   (语音模型列表)
+
+    需要在 https://fish.audio 注册获取 API Key。
     """
 
-    def __init__(self, api_key: str = "", api_url: str = ""):
+    # 预定义的常用系统语音
+    DEFAULT_VOICES = [
+        VoiceInfo(id="default", name="默认语音", language="zh-CN", gender="Female"),
+        VoiceInfo(id="speech-1", name="中文女声 1", language="zh-CN", gender="Female"),
+        VoiceInfo(id="speech-2", name="中文男声 1", language="zh-CN", gender="Male"),
+    ]
+
+    def __init__(self, api_key: str = "", api_url: str = "https://api.fish.audio"):
         self.api_key = api_key
-        self.api_url = api_url
+        self.api_url = api_url.rstrip("/")
 
     async def generate_speech(self, text: str, voice_id: str, output_path: Optional[str] = None) -> str:
-        raise NotImplementedError("FishSpeech 适配器尚未实现，请等待后续版本")
+        """调用 Fish Audio TTS API 生成语音。"""
+        if not self.api_key:
+            raise TTSError("Fish Audio API Key 未配置", code="TTS_NO_API_KEY")
+        if not text or not text.strip():
+            raise TTSGenerationError("文本内容不能为空")
+
+        if output_path is None:
+            out_dir = Path(tempfile.gettempdir()) / "tts_output"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            output_path = str(out_dir / f"fish_{uuid.uuid4().hex[:8]}.mp3")
+
+        import httpx
+        url = f"{self.api_url}/v1/tts"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "text": text,
+            "reference_id": voice_id if voice_id != "default" else None,
+            "format": "mp3",
+            "latency": "normal",
+        }
+        # 移除 None 值
+        payload = {k: v for k, v in payload.items() if v is not None}
+
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code != 200:
+                    raise TTSGenerationError(f"Fish Audio API 错误: {resp.status_code} - {resp.text[:200]}")
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, "wb") as f:
+                    f.write(resp.content)
+            return output_path
+        except TTSError:
+            raise
+        except Exception as e:
+            raise TTSGenerationError(f"Fish Audio 生成失败: {e}")
 
     async def list_voices(self) -> list[VoiceInfo]:
-        return []
+        """获取 Fish Audio 可用语音模型列表。"""
+        if not self.api_key:
+            return list(self.DEFAULT_VOICES)
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(
+                    f"{self.api_url}/model",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    params={"page_size": 50, "title": "", "tag": "zh"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    items = data.get("items", [])
+                    voices = []
+                    for item in items[:30]:
+                        voices.append(VoiceInfo(
+                            id=item.get("_id", ""),
+                            name=item.get("title", "未知"),
+                            language="zh-CN",
+                            gender="Unknown",
+                        ))
+                    if voices:
+                        return voices
+        except Exception:
+            logger.warning("获取 Fish Audio 语音列表失败，使用默认列表")
+        return list(self.DEFAULT_VOICES)
 
     def get_engine_info(self) -> EngineInfo:
         return EngineInfo(
             name="fish-speech",
-            display_name="Fish Speech",
+            display_name="Fish Audio（收费）",
             is_paid=True,
-            supported_languages=["zh-CN", "en-US", "ja-JP"],
+            supported_languages=["zh-CN", "en-US", "ja-JP", "ko-KR"],
             requires_api_key=True,
-            description="高质量中文语音合成，支持语音克隆",
+            description="高质量多语言语音合成，支持语音克隆。注册: https://fish.audio",
         )
 
 
 class CosyVoiceAdapter(TTSAdapter):
-    """CosyVoice (阿里) 适配器（收费，多语言高质量）。
+    """CosyVoice (阿里通义) 适配器（收费，兼容 OpenAI TTS API 格式）。
 
-    预留骨架，后续迭代开发。
+    阿里 DashScope 平台提供 CosyVoice 语音合成服务。
+    API 文档: https://help.aliyun.com/zh/model-studio/developer-reference/cosyvoice
+
+    使用 OpenAI 兼容格式:
+    POST {base_url}/v1/audio/speech
     """
 
-    def __init__(self, api_key: str = "", api_url: str = ""):
+    DEFAULT_VOICES = [
+        VoiceInfo(id="longxiaochun", name="龙小淳（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="longxiaoxia", name="龙小夏（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="longxiaobai", name="龙小白（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="longlaotie", name="龙老铁（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="longshu", name="龙叔（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="longjielidou", name="龙杰力豆（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="loongstella", name="Stella（女/英文）", language="en-US", gender="Female"),
+    ]
+
+    def __init__(self, api_key: str = "", api_url: str = "https://dashscope.aliyuncs.com/compatible-mode"):
         self.api_key = api_key
-        self.api_url = api_url
+        self.api_url = api_url.rstrip("/")
 
     async def generate_speech(self, text: str, voice_id: str, output_path: Optional[str] = None) -> str:
-        raise NotImplementedError("CosyVoice 适配器尚未实现，请等待后续版本")
+        """调用阿里 DashScope CosyVoice API 生成语音。"""
+        if not self.api_key:
+            raise TTSError("CosyVoice API Key 未配置", code="TTS_NO_API_KEY")
+        if not text or not text.strip():
+            raise TTSGenerationError("文本内容不能为空")
+
+        if output_path is None:
+            out_dir = Path(tempfile.gettempdir()) / "tts_output"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            output_path = str(out_dir / f"cosyvoice_{uuid.uuid4().hex[:8]}.mp3")
+
+        import httpx
+        url = f"{self.api_url}/v1/audio/speech"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": "cosyvoice-v1",
+            "input": text,
+            "voice": voice_id or "longxiaochun",
+            "response_format": "mp3",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code != 200:
+                    raise TTSGenerationError(f"CosyVoice API 错误: {resp.status_code} - {resp.text[:200]}")
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, "wb") as f:
+                    f.write(resp.content)
+            return output_path
+        except TTSError:
+            raise
+        except Exception as e:
+            raise TTSGenerationError(f"CosyVoice 生成失败: {e}")
 
     async def list_voices(self) -> list[VoiceInfo]:
-        return []
+        return list(self.DEFAULT_VOICES)
 
     def get_engine_info(self) -> EngineInfo:
         return EngineInfo(
             name="cosyvoice",
-            display_name="CosyVoice（阿里）",
+            display_name="CosyVoice（阿里通义）",
             is_paid=True,
             supported_languages=["zh-CN", "en-US", "ja-JP", "ko-KR"],
             requires_api_key=True,
-            description="阿里通义实验室多语言高质量语音合成",
+            description="阿里通义 CosyVoice 语音合成。注册: https://dashscope.console.aliyun.com",
         )
 
 
 class MiniMaxTTSAdapter(TTSAdapter):
-    """MiniMax TTS 适配器（收费，情感丰富）。
+    """MiniMax TTS 适配器（收费，情感丰富语音合成）。
 
-    预留骨架，后续迭代开发。
+    API 文档: https://platform.minimaxi.com/document/T2A%20V2
+    - POST https://api.minimax.chat/v1/t2a_v2?GroupId={group_id}
+
+    响应格式（JSON）:
+    {
+      "base_resp": {"status_code": 0, "status_msg": "success"},
+      "data": {
+        "audio": "<hex编码的音频数据>",
+        "status": 1  (1=最后一段)
+      },
+      "extra_info": {"audio_file": ..., "audio_size": ..., "bitrate": ...}
+    }
+
+    注意: audio 字段是十六进制编码的 MP3 数据，需要 bytes.fromhex() 解码。
+    需要 API Key 和 Group ID（从 MiniMax 开放平台获取）。
     """
 
-    def __init__(self, api_key: str = "", api_url: str = ""):
+    DEFAULT_VOICES = [
+        VoiceInfo(id="male-qn-qingse", name="青涩青年（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="male-qn-jingying", name="精英青年（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="male-qn-badao", name="霸道青年（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="male-qn-daxuesheng", name="大学生（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="female-shaonv", name="少女（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="female-yujie", name="御姐（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="female-chengshu", name="成熟女性（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="female-tianmei", name="甜美女声（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="presenter_male", name="男性主持人", language="zh-CN", gender="Male"),
+        VoiceInfo(id="presenter_female", name="女性主持人", language="zh-CN", gender="Female"),
+    ]
+
+    def __init__(self, api_key: str = "", group_id: str = "", api_url: str = "https://api.minimax.chat"):
         self.api_key = api_key
-        self.api_url = api_url
+        self.group_id = group_id
+        self.api_url = api_url.rstrip("/")
 
     async def generate_speech(self, text: str, voice_id: str, output_path: Optional[str] = None) -> str:
-        raise NotImplementedError("MiniMax TTS 适配器尚未实现，请等待后续版本")
+        """调用 MiniMax T2A V2 API 生成语音。
+
+        MiniMax 返回 JSON，其中 data.audio 是十六进制编码的 MP3 音频。
+        """
+        if not self.api_key:
+            raise TTSError("MiniMax API Key 未配置", code="TTS_NO_API_KEY")
+        if not self.group_id:
+            raise TTSError("MiniMax Group ID 未配置", code="TTS_NO_GROUP_ID")
+        if not text or not text.strip():
+            raise TTSGenerationError("文本内容不能为空")
+
+        if output_path is None:
+            out_dir = Path(tempfile.gettempdir()) / "tts_output"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            output_path = str(out_dir / f"minimax_{uuid.uuid4().hex[:8]}.mp3")
+
+        import httpx
+        url = f"{self.api_url}/v1/t2a_v2?GroupId={self.group_id}"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": "speech-01-turbo",
+            "text": text,
+            "stream": False,
+            "voice_setting": {
+                "voice_id": voice_id or "male-qn-qingse",
+                "speed": 1.0,
+                "vol": 1.0,
+                "pitch": 0,
+            },
+            "audio_setting": {
+                "sample_rate": 32000,
+                "bitrate": 128000,
+                "format": "mp3",
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code != 200:
+                    raise TTSGenerationError(f"MiniMax API HTTP 错误: {resp.status_code} - {resp.text[:200]}")
+
+                data = resp.json()
+                # 检查业务状态码
+                base_resp = data.get("base_resp", {})
+                if base_resp.get("status_code", -1) != 0:
+                    err_msg = base_resp.get("status_msg", "未知错误")
+                    raise TTSGenerationError(f"MiniMax API 业务错误: {err_msg}")
+
+                # 提取十六进制编码的音频数据
+                audio_hex = data.get("data", {}).get("audio")
+                if not audio_hex:
+                    raise TTSGenerationError("MiniMax API 返回数据中没有音频内容")
+
+                # 十六进制解码为二进制 MP3
+                audio_bytes = bytes.fromhex(audio_hex)
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, "wb") as f:
+                    f.write(audio_bytes)
+
+            return output_path
+        except TTSError:
+            raise
+        except Exception as e:
+            raise TTSGenerationError(f"MiniMax 生成失败: {e}")
 
     async def list_voices(self) -> list[VoiceInfo]:
-        return []
+        return list(self.DEFAULT_VOICES)
 
     def get_engine_info(self) -> EngineInfo:
         return EngineInfo(
             name="minimax-tts",
-            display_name="MiniMax TTS",
+            display_name="MiniMax TTS（情感丰富）",
             is_paid=True,
             supported_languages=["zh-CN", "en-US"],
             requires_api_key=True,
-            description="MiniMax 情感丰富语音合成",
+            description="MiniMax 情感丰富语音合成，支持多种音色和情感控制。注册: https://platform.minimaxi.com",
         )
 
 
 class VolcEngineTTSAdapter(TTSAdapter):
     """火山引擎 TTS 适配器（收费，字节跳动，抖音同款音色）。
 
-    预留骨架，后续迭代开发。
+    API 文档: https://www.volcengine.com/docs/6561/79823
+    - POST https://openspeech.bytedance.com/api/v1/tts
+
+    请求头需要 Authorization: Bearer;{access_token}
+    请求体:
+    {
+      "app": {"appid": "xxx", "token": "access_token", "cluster": "volcano_tts"},
+      "user": {"uid": "xxx"},
+      "audio": {"voice_type": "xxx", "encoding": "mp3", "speed_ratio": 1.0},
+      "request": {"reqid": "xxx", "text": "xxx", "operation": "query"}
+    }
+
+    响应格式（JSON）:
+    {
+      "code": 3000,  (3000=成功)
+      "message": "Success",
+      "data": "<base64编码的音频数据>"
+    }
+
+    注意: data 字段是 base64 编码的音频，需要 base64.b64decode() 解码。
+    需要 App ID 和 Access Token（从火山引擎控制台获取）。
     """
 
-    def __init__(self, api_key: str = "", api_url: str = ""):
-        self.api_key = api_key
-        self.api_url = api_url
+    DEFAULT_VOICES = [
+        VoiceInfo(id="zh_female_cancan", name="灿灿（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="zh_male_chunhou", name="淳厚（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="zh_female_shuangkuai", name="爽快（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="zh_male_yangguang", name="阳光（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="zh_female_wenrou", name="温柔（女）", language="zh-CN", gender="Female"),
+        VoiceInfo(id="zh_male_qinqie", name="亲切（男）", language="zh-CN", gender="Male"),
+        VoiceInfo(id="zh_female_story", name="故事女声", language="zh-CN", gender="Female"),
+        VoiceInfo(id="zh_male_story", name="故事男声", language="zh-CN", gender="Male"),
+    ]
+
+    def __init__(self, app_id: str = "", access_token: str = "",
+                 api_url: str = "https://openspeech.bytedance.com"):
+        self.app_id = app_id
+        self.access_token = access_token
+        self.api_url = api_url.rstrip("/")
 
     async def generate_speech(self, text: str, voice_id: str, output_path: Optional[str] = None) -> str:
-        raise NotImplementedError("火山引擎 TTS 适配器尚未实现，请等待后续版本")
+        """调用火山引擎 TTS API 生成语音。
+
+        火山引擎返回 JSON，其中 data 是 base64 编码的音频。
+        """
+        if not self.access_token:
+            raise TTSError("火山引擎 Access Token 未配置", code="TTS_NO_API_KEY")
+        if not self.app_id:
+            raise TTSError("火山引擎 App ID 未配置", code="TTS_NO_APP_ID")
+        if not text or not text.strip():
+            raise TTSGenerationError("文本内容不能为空")
+
+        if output_path is None:
+            out_dir = Path(tempfile.gettempdir()) / "tts_output"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            output_path = str(out_dir / f"volc_{uuid.uuid4().hex[:8]}.mp3")
+
+        import base64
+        import httpx
+
+        url = f"{self.api_url}/api/v1/tts"
+        headers = {
+            "Authorization": f"Bearer;{self.access_token}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "app": {
+                "appid": self.app_id,
+                "token": self.access_token,
+                "cluster": "volcano_tts",
+            },
+            "user": {
+                "uid": "ai-video-generator",
+            },
+            "audio": {
+                "voice_type": voice_id or "zh_female_cancan",
+                "encoding": "mp3",
+                "speed_ratio": 1.0,
+            },
+            "request": {
+                "reqid": uuid.uuid4().hex,
+                "text": text,
+                "operation": "query",
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code != 200:
+                    raise TTSGenerationError(f"火山引擎 API HTTP 错误: {resp.status_code} - {resp.text[:200]}")
+
+                data = resp.json()
+                # 检查业务状态码 (3000 = 成功)
+                code = data.get("code", -1)
+                if code != 3000:
+                    err_msg = data.get("message", "未知错误")
+                    raise TTSGenerationError(f"火山引擎 API 错误 (code={code}): {err_msg}")
+
+                # 提取 base64 编码的音频数据
+                audio_b64 = data.get("data")
+                if not audio_b64:
+                    raise TTSGenerationError("火山引擎 API 返回数据中没有音频内容")
+
+                # base64 解码为二进制 MP3
+                audio_bytes = base64.b64decode(audio_b64)
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, "wb") as f:
+                    f.write(audio_bytes)
+
+            return output_path
+        except TTSError:
+            raise
+        except Exception as e:
+            raise TTSGenerationError(f"火山引擎生成失败: {e}")
 
     async def list_voices(self) -> list[VoiceInfo]:
-        return []
+        return list(self.DEFAULT_VOICES)
 
     def get_engine_info(self) -> EngineInfo:
         return EngineInfo(
             name="volcengine-tts",
             display_name="火山引擎 TTS（字节跳动）",
             is_paid=True,
-            supported_languages=["zh-CN", "en-US"],
+            supported_languages=["zh-CN", "en-US", "ja-JP"],
             requires_api_key=True,
-            description="字节跳动火山引擎语音合成，抖音同款音色",
+            description="字节跳动火山引擎语音合成，抖音同款音色。注册: https://console.volcengine.com",
         )
 
 
@@ -524,15 +862,51 @@ class TTSService:
         6.4: 使用用户指定的引擎生成语音
     """
 
-    def __init__(self, projects_dir: Optional[Path] = None):
+    def __init__(self, projects_dir: Optional[Path] = None, config: Optional[dict] = None):
         self.adapters: dict[str, TTSAdapter] = {}
         self.projects_dir = projects_dir or DEFAULT_PROJECTS_DIR
+        self._config = config or {}
         self._register_default_adapters()
 
     def _register_default_adapters(self) -> None:
-        """注册默认的免费 TTS 适配器。"""
+        """注册默认的免费 TTS 适配器 + 已配置 API Key 的收费适配器。"""
         self.adapters["edge-tts"] = EdgeTTSAdapter()
         self.adapters["chattts"] = ChatTTSAdapter()
+
+        # Fish Audio — 需要 API Key
+        fish_key = self._config.get("fish_audio_api_key", "")
+        if fish_key:
+            self.adapters["fish-speech"] = FishSpeechAdapter(api_key=fish_key)
+        else:
+            # 即使没有 key 也注册，让用户能在引擎列表中看到（生成时会报错提示配置）
+            self.adapters["fish-speech"] = FishSpeechAdapter()
+
+        # CosyVoice（阿里通义）— 需要 DashScope API Key
+        cosy_key = self._config.get("cosyvoice_api_key", "")
+        if cosy_key:
+            self.adapters["cosyvoice"] = CosyVoiceAdapter(api_key=cosy_key)
+        else:
+            self.adapters["cosyvoice"] = CosyVoiceAdapter()
+
+        # MiniMax — 需要 API Key + Group ID
+        minimax_key = self._config.get("minimax_api_key", "")
+        minimax_group = self._config.get("minimax_group_id", "")
+        if minimax_key:
+            self.adapters["minimax-tts"] = MiniMaxTTSAdapter(
+                api_key=minimax_key, group_id=minimax_group
+            )
+        else:
+            self.adapters["minimax-tts"] = MiniMaxTTSAdapter()
+
+        # 火山引擎 — 需要 App ID + Access Token
+        volc_token = self._config.get("volcengine_access_token", "")
+        volc_app_id = self._config.get("volcengine_app_id", "")
+        if volc_token:
+            self.adapters["volcengine-tts"] = VolcEngineTTSAdapter(
+                app_id=volc_app_id, access_token=volc_token
+            )
+        else:
+            self.adapters["volcengine-tts"] = VolcEngineTTSAdapter()
 
     def register_adapter(self, name: str, adapter: TTSAdapter) -> None:
         """注册新的 TTS 适配器。
@@ -580,7 +954,8 @@ class TTSService:
         if project_id and scene_id:
             audio_dir = self.projects_dir / project_id / "audio"
             audio_dir.mkdir(parents=True, exist_ok=True)
-            ext = "mp3" if engine == "edge-tts" else "wav"
+            # ChatTTS 输出 WAV，其他引擎（edge-tts 和所有收费引擎）都输出 MP3
+            ext = "wav" if engine == "chattts" else "mp3"
             output_path = str(audio_dir / f"scene_{scene_id}.{ext}")
 
         return await adapter.generate_speech(text, voice_id, output_path)

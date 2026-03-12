@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { ProjectListPage } from './pages/ProjectListPage'
 import { ProjectWorkbench } from './pages/ProjectWorkbench'
@@ -8,6 +8,27 @@ import { CharacterManagePage } from './pages/CharacterManagePage'
 import { StoryboardPage } from './pages/StoryboardPage'
 import { VideoPreviewPage } from './pages/VideoPreviewPage'
 import { SettingsPage } from './pages/SettingsPage'
+
+// Mock apiClient 以避免异步加载阻塞路由测试
+vi.mock('./services/api-client', async () => {
+  const actual = await vi.importActual('./services/api-client')
+  return {
+    ...actual,
+    apiClient: {
+      listProjects: vi.fn().mockResolvedValue([]),
+      getProject: vi.fn().mockResolvedValue({ id: 'test', name: 'Test', status: 'created' }),
+      getCharacters: vi.fn().mockResolvedValue([]),
+      getScenes: vi.fn().mockResolvedValue([]),
+      listTTSEngines: vi.fn().mockResolvedValue([]),
+      listTTSVoices: vi.fn().mockResolvedValue([]),
+      generateSpeech: vi.fn().mockResolvedValue({ audio_path: '' }),
+      getFileUrl: vi.fn().mockReturnValue(''),
+      exportVideo: vi.fn().mockResolvedValue({ video_path: '' }),
+      submitText: vi.fn().mockResolvedValue({ status: 'valid', message: '', char_count: 0 }),
+      getPipelineStatus: vi.fn().mockResolvedValue({ current_step: null, progress: 0, step_detail: '', estimated_remaining: 0 }),
+    }
+  }
+})
 
 // 辅助函数：渲染指定路由
 function renderWithRouter(initialRoute: string) {
@@ -43,19 +64,19 @@ describe('页面路由', () => {
     expect(screen.getByText('文本输入')).toBeInTheDocument()
   })
 
-  it('/project/:id/chars 渲染角色管理页', () => {
+  it('/project/:id/chars 渲染角色管理页', async () => {
     renderWithRouter('/project/abc/chars')
-    expect(screen.getByText('角色管理')).toBeInTheDocument()
+    expect(await screen.findByText('角色管理')).toBeInTheDocument()
   })
 
-  it('/project/:id/story 渲染分镜编辑页', () => {
+  it('/project/:id/story 渲染分镜编辑页', async () => {
     renderWithRouter('/project/abc/story')
-    expect(screen.getByText('分镜编辑')).toBeInTheDocument()
+    expect(await screen.findByText('分镜编辑')).toBeInTheDocument()
   })
 
-  it('/project/:id/preview 渲染视频预览页', () => {
+  it('/project/:id/preview 渲染视频预览页', async () => {
     renderWithRouter('/project/abc/preview')
-    expect(screen.getByText('视频预览')).toBeInTheDocument()
+    expect(await screen.findByText('视频预览')).toBeInTheDocument()
   })
 
   it('/settings 渲染设置页', () => {

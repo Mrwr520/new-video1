@@ -12,6 +12,7 @@ export function CharacterManagePage(): JSX.Element {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newChar, setNewChar] = useState<CharacterUpdate>({ name: '' })
   const [confirming, setConfirming] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
 
   const loadCharacters = useCallback(async () => {
     if (!projectId) return
@@ -78,6 +79,7 @@ export function CharacterManagePage(): JSX.Element {
     try {
       setConfirming(true)
       await apiClient.confirmCharacters(projectId)
+      setConfirmed(true)
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : '确认角色失败')
@@ -89,69 +91,92 @@ export function CharacterManagePage(): JSX.Element {
   if (loading) return <div className="page"><p>加载中...</p></div>
 
   return (
-    <div className="page character-manage-page" style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ margin: 0 }}>角色管理</h1>
+    <div className="page character-manage-page">
+      <header className="page-header">
+        <h1>角色管理</h1>
         <Link to={`/project/${projectId}`}>返回工作台</Link>
-      </div>
+      </header>
 
-      {error && <div role="alert" style={{ color: 'red', marginBottom: '16px', padding: '8px', border: '1px solid red', borderRadius: '4px' }}>{error}</div>}
+      {error && <div className="alert alert-danger" role="alert">{error}</div>}
 
-      <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
+      <div className="header-actions">
         <button onClick={() => setShowAddForm(true)} aria-label="手动添加角色">+ 添加角色</button>
-        <button onClick={handleConfirm} disabled={confirming || characters.length === 0} aria-label="确认所有角色">
-          {confirming ? '确认中...' : '确认角色'}
+        <button onClick={handleConfirm} disabled={confirming || confirmed} aria-label="确认所有角色">
+          {confirming ? '确认中...' : confirmed ? '✓ 已确认' : characters.length === 0 ? '跳过并继续' : '确认角色'}
         </button>
       </div>
 
+      {confirmed && (
+        <div className="alert alert-success">
+          {characters.length > 0 ? '角色已确认' : '已跳过角色确认'}，Pipeline 将自动继续执行。
+          <Link to={`/project/${projectId}`} style={{ marginLeft: 8 }}>返回工作台查看进度</Link>
+        </div>
+      )}
+
       {showAddForm && (
-        <div style={{ border: '1px solid #ccc', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+        <div className="card" style={{ marginBottom: 16 }}>
           <h3>添加新角色</h3>
-          <label htmlFor="new-char-name">名称</label>
-          <input id="new-char-name" value={newChar.name || ''} onChange={e => setNewChar({ ...newChar, name: e.target.value })} style={{ display: 'block', width: '100%', marginBottom: '8px' }} />
-          <label htmlFor="new-char-appearance">外貌</label>
-          <textarea id="new-char-appearance" value={newChar.appearance || ''} onChange={e => setNewChar({ ...newChar, appearance: e.target.value })} rows={2} style={{ display: 'block', width: '100%', marginBottom: '8px' }} />
-          <label htmlFor="new-char-personality">性格</label>
-          <textarea id="new-char-personality" value={newChar.personality || ''} onChange={e => setNewChar({ ...newChar, personality: e.target.value })} rows={2} style={{ display: 'block', width: '100%', marginBottom: '8px' }} />
-          <label htmlFor="new-char-background">背景</label>
-          <textarea id="new-char-background" value={newChar.background || ''} onChange={e => setNewChar({ ...newChar, background: e.target.value })} rows={2} style={{ display: 'block', width: '100%', marginBottom: '8px' }} />
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="form-field">
+            <label htmlFor="new-char-name">名称</label>
+            <input id="new-char-name" value={newChar.name || ''} onChange={e => setNewChar({ ...newChar, name: e.target.value })} />
+          </div>
+          <div className="form-field">
+            <label htmlFor="new-char-appearance">外貌</label>
+            <textarea id="new-char-appearance" value={newChar.appearance || ''} onChange={e => setNewChar({ ...newChar, appearance: e.target.value })} rows={2} />
+          </div>
+          <div className="form-field">
+            <label htmlFor="new-char-personality">性格</label>
+            <textarea id="new-char-personality" value={newChar.personality || ''} onChange={e => setNewChar({ ...newChar, personality: e.target.value })} rows={2} />
+          </div>
+          <div className="form-field">
+            <label htmlFor="new-char-background">背景</label>
+            <textarea id="new-char-background" value={newChar.background || ''} onChange={e => setNewChar({ ...newChar, background: e.target.value })} rows={2} />
+          </div>
+          <div className="form-actions">
             <button onClick={handleAddCharacter} disabled={!newChar.name}>保存</button>
-            <button onClick={() => { setShowAddForm(false); setNewChar({ name: '' }) }}>取消</button>
+            <button className="btn-secondary" onClick={() => { setShowAddForm(false); setNewChar({ name: '' }) }}>取消</button>
           </div>
         </div>
       )}
 
       {characters.length === 0 ? (
-        <p>暂无角色。可以手动添加，或等待 LLM 自动提取。</p>
+        <p>LLM 未从文本中提取到角色。你可以手动添加角色，或点击"跳过并继续"直接进入下一步。</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="character-list">
           {characters.map(char => (
-            <div key={char.id} style={{ border: '1px solid #ddd', padding: '16px', borderRadius: '8px' }}>
+            <div key={char.id} className="character-card">
               {editingId === char.id ? (
                 <div>
-                  <label htmlFor={`edit-name-${char.id}`}>名称</label>
-                  <input id={`edit-name-${char.id}`} value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} style={{ display: 'block', width: '100%', marginBottom: '8px' }} />
-                  <label htmlFor={`edit-appearance-${char.id}`}>外貌</label>
-                  <textarea id={`edit-appearance-${char.id}`} value={editForm.appearance || ''} onChange={e => setEditForm({ ...editForm, appearance: e.target.value })} rows={2} style={{ display: 'block', width: '100%', marginBottom: '8px' }} />
-                  <label htmlFor={`edit-personality-${char.id}`}>性格</label>
-                  <textarea id={`edit-personality-${char.id}`} value={editForm.personality || ''} onChange={e => setEditForm({ ...editForm, personality: e.target.value })} rows={2} style={{ display: 'block', width: '100%', marginBottom: '8px' }} />
-                  <label htmlFor={`edit-background-${char.id}`}>背景</label>
-                  <textarea id={`edit-background-${char.id}`} value={editForm.background || ''} onChange={e => setEditForm({ ...editForm, background: e.target.value })} rows={2} style={{ display: 'block', width: '100%', marginBottom: '8px' }} />
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div className="form-field">
+                    <label htmlFor={`edit-name-${char.id}`}>名称</label>
+                    <input id={`edit-name-${char.id}`} value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor={`edit-appearance-${char.id}`}>外貌</label>
+                    <textarea id={`edit-appearance-${char.id}`} value={editForm.appearance || ''} onChange={e => setEditForm({ ...editForm, appearance: e.target.value })} rows={2} />
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor={`edit-personality-${char.id}`}>性格</label>
+                    <textarea id={`edit-personality-${char.id}`} value={editForm.personality || ''} onChange={e => setEditForm({ ...editForm, personality: e.target.value })} rows={2} />
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor={`edit-background-${char.id}`}>背景</label>
+                    <textarea id={`edit-background-${char.id}`} value={editForm.background || ''} onChange={e => setEditForm({ ...editForm, background: e.target.value })} rows={2} />
+                  </div>
+                  <div className="form-actions">
                     <button onClick={handleSaveEdit}>保存</button>
-                    <button onClick={() => setEditingId(null)}>取消</button>
+                    <button className="btn-secondary" onClick={() => setEditingId(null)}>取消</button>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <h3 style={{ margin: '0 0 8px 0' }}>{char.name}</h3>
-                  {char.appearance && <p><strong>外貌：</strong>{char.appearance}</p>}
-                  {char.personality && <p><strong>性格：</strong>{char.personality}</p>}
-                  {char.background && <p><strong>背景：</strong>{char.background}</p>}
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <h3>{char.name}</h3>
+                  {char.appearance && <><div className="field-label">外貌</div><div className="field-value">{char.appearance}</div></>}
+                  {char.personality && <><div className="field-label">性格</div><div className="field-value">{char.personality}</div></>}
+                  {char.background && <><div className="field-label">背景</div><div className="field-value">{char.background}</div></>}
+                  <div className="card-actions">
                     <button onClick={() => handleEdit(char)} aria-label={`编辑 ${char.name}`}>编辑</button>
-                    <button onClick={() => handleDelete(char.id)} aria-label={`删除 ${char.name}`} style={{ color: 'red' }}>删除</button>
+                    <button className="btn-danger" onClick={() => handleDelete(char.id)} aria-label={`删除 ${char.name}`}>删除</button>
                   </div>
                 </div>
               )}

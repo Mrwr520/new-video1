@@ -68,9 +68,10 @@ async def test_confirm_characters(client):
     res = await client.post("/api/projects", json={"name": "P", "template_id": "anime"})
     pid = res.json()["id"]
 
-    # 没有角色时确认应失败
+    # 没有角色时确认也应成功（跳过角色步骤）
     res = await client.post(f"/api/projects/{pid}/confirm-characters")
-    assert res.status_code == 400
+    assert res.status_code == 200
+    assert res.json()["count"] == 0
 
     # 添加角色后确认
     await client.post(f"/api/projects/{pid}/characters", json={"name": "A"})

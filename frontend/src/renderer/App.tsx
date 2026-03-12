@@ -6,6 +6,7 @@ import { CharacterManagePage } from './pages/CharacterManagePage'
 import { StoryboardPage } from './pages/StoryboardPage'
 import { VideoPreviewPage } from './pages/VideoPreviewPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ModelManagePage } from './pages/ModelManagePage'
 
 export function App(): JSX.Element {
   return (
@@ -25,6 +26,9 @@ export function App(): JSX.Element {
 
         {/* 设置页 */}
         <Route path="/settings" element={<SettingsPage />} />
+
+        {/* 模型管理页 */}
+        <Route path="/models" element={<ModelManagePage />} />
       </Routes>
     </HashRouter>
   )

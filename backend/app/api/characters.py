@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.database import get_connection
 from app.models.character import Character, CharacterUpdate
+from app.api.events import get_engine
 
 router = APIRouter(prefix="/api/projects", tags=["characters"])
 
@@ -138,20 +139,23 @@ async def confirm_characters(project_id: str):
             (project_id,),
         )
         row = await cursor.fetchone()
-        if row["cnt"] == 0:
-            raise HTTPException(status_code=400, detail="没有角色可确认")
+        count = row["cnt"]
 
-        await conn.execute(
-            "UPDATE characters SET confirmed = TRUE WHERE project_id = ?",
-            (project_id,),
-        )
-        now = datetime.now(timezone.utc).isoformat()
-        await conn.execute(
-            "UPDATE projects SET current_step = 'characters_confirmed', updated_at = ? WHERE id = ?",
-            (now, project_id),
-        )
+        if count > 0:
+            await conn.execute(
+                "UPDATE characters SET confirmed = TRUE WHERE project_id = ?",
+                (project_id,),
+            )
+
         await conn.commit()
-        return {"message": "角色已确认", "count": row["cnt"]}
+
+        # 通知 Pipeline 引擎继续执行（释放 waiting_confirmation 等待循环）
+        # 注意：不要修改 current_step 为非 PipelineStep 的值，
+        # 否则重启后 confirm_step 无法从 DB 恢复正确的步骤
+        engine = get_engine()
+        await engine.confirm_step(project_id)
+
+        return {"message": "角色已确认", "count": count}
     finally:
         await conn.close()
 

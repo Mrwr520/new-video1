@@ -14,7 +14,10 @@ vi.mock('../services/api-client', async () => {
       deleteScene: vi.fn(),
       reorderScenes: vi.fn(),
       confirmStoryboard: vi.fn(),
-      regenerateKeyframe: vi.fn()
+      regenerateKeyframe: vi.fn(),
+      listTTSEngines: vi.fn().mockResolvedValue([]),
+      listTTSVoices: vi.fn().mockResolvedValue([]),
+      generateSpeech: vi.fn().mockResolvedValue({ audio_path: '' })
     }
   }
 })
@@ -73,10 +76,10 @@ describe('StoryboardPage - 关键帧功能', () => {
     renderPage()
 
     await waitFor(() => {
-      const imgContainer = screen.getByTestId('keyframe-image-scene-2')
-      const img = imgContainer.querySelector('img')
+      const img = screen.getByTestId('keyframe-image-scene-2')
       expect(img).toBeTruthy()
-      expect(img!.alt).toBe('分镜 2 关键帧')
+      expect(img.tagName).toBe('IMG')
+      expect(img.getAttribute('alt')).toBe('分镜 2 关键帧')
     })
   })
 

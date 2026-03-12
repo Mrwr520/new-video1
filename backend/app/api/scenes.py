@@ -12,6 +12,7 @@ from app.models.character import Character
 from app.models.scene import StoryboardScene, SceneUpdate
 from app.services.image_service import ImageGeneratorService, ImageGenError
 from app.services.framepack_service import FramePackService, FramePackError
+from app.api.events import get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -144,12 +145,14 @@ async def confirm_storyboard(project_id: str):
         if row["cnt"] == 0:
             raise HTTPException(status_code=400, detail="没有分镜可确认")
         await conn.execute("UPDATE scenes SET confirmed = TRUE WHERE project_id = ?", (project_id,))
-        now = datetime.now(timezone.utc).isoformat()
-        await conn.execute(
-            "UPDATE projects SET current_step = 'storyboard_confirmed', updated_at = ? WHERE id = ?",
-            (now, project_id),
-        )
         await conn.commit()
+
+        # 通知 Pipeline 引擎继续执行（释放 waiting_confirmation 等待循环）
+        # 注意：不要修改 current_step 为非 PipelineStep 的值，
+        # 否则重启后 confirm_step 无法从 DB 恢复正确的步骤
+        engine = get_engine()
+        await engine.confirm_step(project_id)
+
         return {"message": "分镜已确认", "count": row["cnt"]}
     finally:
         await conn.close()

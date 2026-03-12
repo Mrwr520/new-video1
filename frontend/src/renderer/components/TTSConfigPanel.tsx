@@ -33,6 +33,7 @@ export function TTSConfigPanel({
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentAudioPath, setCurrentAudioPath] = useState<string | null>(audioPath)
+  const [audioCacheBuster, setAudioCacheBuster] = useState(Date.now())
   const audioRef = useRef<HTMLAudioElement>(null)
 
   // 加载引擎列表
@@ -67,7 +68,14 @@ export function TTSConfigPanel({
         voice_id: selectedVoice,
       })
       setCurrentAudioPath(result.audio_path)
+      setAudioCacheBuster(Date.now())
       onSpeechGenerated?.(result.audio_path)
+      // 强制 audio 元素重新加载
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.load()
+        }
+      }, 100)
     } catch (e) {
       setError(e instanceof Error ? e.message : '语音生成失败')
     } finally {
@@ -75,11 +83,13 @@ export function TTSConfigPanel({
     }
   }
 
-  /** 构建音频文件的 URL */
+  /** 构建音频文件的 URL（带缓存破坏参数） */
   const getAudioUrl = (path: string): string => {
-    const match = path.match(/projects[\\/](.+)/)
+    // audio_path 格式: .../projects/{projectId}/audio/scene_xxx.mp3
+    // 需要提取 projectId 之后的相对路径部分
+    const match = path.match(/projects[\\/][^\\/]+[\\/](.+)/)
     if (match) {
-      return `http://localhost:8000/api/projects/${projectId}/files/${match[1].replace(/\\/g, '/')}`
+      return `http://localhost:8000/api/projects/${projectId}/files/${match[1].replace(/\\/g, '/')}?t=${audioCacheBuster}`
     }
     return path
   }

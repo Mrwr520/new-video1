@@ -169,9 +169,16 @@ export interface AppConfig {
   backend_port: number
   llm_api_key: string
   llm_api_url: string
+  image_gen_mode: string
   image_gen_api_key: string
   image_gen_api_url: string
-  tts_engine: 'edge-tts' | 'chattts'
+  tts_engine: string
+  fish_audio_api_key: string
+  cosyvoice_api_key: string
+  minimax_api_key: string
+  minimax_group_id: string
+  volcengine_access_token: string
+  volcengine_app_id: string
 }
 
 export interface AppConfigUpdate {
@@ -180,9 +187,16 @@ export interface AppConfigUpdate {
   backend_port?: number
   llm_api_key?: string
   llm_api_url?: string
+  image_gen_mode?: string
   image_gen_api_key?: string
   image_gen_api_url?: string
-  tts_engine?: 'edge-tts' | 'chattts'
+  tts_engine?: string
+  fish_audio_api_key?: string
+  cosyvoice_api_key?: string
+  minimax_api_key?: string
+  minimax_group_id?: string
+  volcengine_access_token?: string
+  volcengine_app_id?: string
 }
 
 // API 错误类型
@@ -194,6 +208,39 @@ export class ApiError extends Error {
     super(detail)
     this.name = 'ApiError'
   }
+}
+
+// 模型管理相关类型
+export interface ModelInfo {
+  id: string
+  name: string
+  description: string
+  hf_repo_id: string
+  estimated_size_gb: number
+  min_vram_gb: number
+  status: 'not_downloaded' | 'downloading' | 'downloaded' | 'loading' | 'loaded' | 'error'
+  download_progress: number
+  error_message: string
+  local_path: string
+}
+
+export interface ModelsListResponse {
+  models: ModelInfo[]
+  cache_size_gb: number
+  active_model: string | null
+}
+
+export interface GPUInfo {
+  available: boolean
+  device_count?: number
+  devices?: Array<{
+    index: number
+    name: string
+    total_memory_gb: number
+    free_memory_gb: number
+  }>
+  cuda_version?: string
+  error?: string
 }
 
 // API 客户端类
@@ -212,7 +259,11 @@ export class ApiClient {
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({ detail: res.statusText }))
-      throw new ApiError(res.status, body.detail || res.statusText)
+      const detail = body.detail
+      const message = typeof detail === 'string'
+        ? detail
+        : detail?.message || detail?.detail || JSON.stringify(detail) || res.statusText
+      throw new ApiError(res.status, message)
     }
     // 204 No Content 不解析 body
     if (res.status === 204) return undefined as T
@@ -415,6 +466,39 @@ export class ApiClient {
       method: 'PUT',
       body: JSON.stringify(data)
     })
+  }
+
+  // ----------------------------------------------------------
+  // 模型管理
+  // ----------------------------------------------------------
+
+  /** 获取所有模型列表及状态 */
+  async listModels(): Promise<ModelsListResponse> {
+    return this.request<ModelsListResponse>('/api/models')
+  }
+
+  /** 获取单个模型信息 */
+  async getModel(modelId: string): Promise<ModelInfo> {
+    return this.request<ModelInfo>(`/api/models/${modelId}`)
+  }
+
+  /** 触发模型下载 */
+  async downloadModel(modelId: string): Promise<{ message: string; status: string }> {
+    return this.request<{ message: string; status: string }>(`/api/models/${modelId}/download`, {
+      method: 'POST'
+    })
+  }
+
+  /** 删除本地缓存的模型 */
+  async deleteModel(modelId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/models/${modelId}`, {
+      method: 'DELETE'
+    })
+  }
+
+  /** 获取 GPU 信息 */
+  async getGPUInfo(): Promise<GPUInfo> {
+    return this.request<GPUInfo>('/api/gpu')
   }
 }
 

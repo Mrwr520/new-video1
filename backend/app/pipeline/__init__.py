@@ -333,6 +333,7 @@ class PipelineEngine:
 
         设置取消标志，Pipeline 会在当前步骤完成或下一个检查点安全终止。
         已完成的步骤结果会被保存。
+        如果 engine 内存中没有该项目的状态（如重启后），则从数据库恢复并直接更新。
 
         Args:
             project_id: 项目 ID
@@ -350,6 +351,11 @@ class PipelineEngine:
 
         # Determine which steps to mark as cancelled
         current_step = self._current_steps.get(project_id)
+
+        # 如果内存中没有当前步骤（重启后丢失），从数据库恢复
+        if current_step is None:
+            current_step = await self._recover_current_step(project_id)
+
         if current_step:
             step_idx = STEP_ORDER.index(current_step)
 
@@ -421,11 +427,8 @@ class PipelineEngine:
     def get_status(self, project_id: str) -> PipelineStatus:
         """获取当前 Pipeline 状态。
 
-        Args:
-            project_id: 项目 ID
-
-        Returns:
-            PipelineStatus 对象
+        如果内存中没有状态（重启后），返回基础状态，
+        由 API 层从数据库补充完整信息。
         """
         current_step = self._current_steps.get(project_id)
         is_running = self._running.get(project_id, False)
@@ -470,8 +473,51 @@ class PipelineEngine:
         """用户确认当前步骤，继续执行下一步。
 
         当 Pipeline 在等待用户确认时调用此方法。
+        如果 Pipeline 不在内存中运行（重启后），则自动恢复执行下一步。
         """
+        was_waiting = self._waiting_confirmation.get(project_id, False)
         self._waiting_confirmation[project_id] = False
+
+        # 如果 Pipeline 不在内存中运行（重启后丢失），自动恢复下一步
+        if not was_waiting and not self._running.get(project_id, False):
+            current_step = await self._recover_current_step(project_id)
+            if current_step and current_step in CONFIRMATION_STEPS:
+                # 找到下一步并恢复执行
+                step_idx = STEP_ORDER.index(current_step)
+                if step_idx + 1 < len(STEP_ORDER):
+                    next_step = STEP_ORDER[step_idx + 1]
+                    logger.info(
+                        "重启后恢复 Pipeline: project=%s, from_step=%s",
+                        project_id, next_step.value,
+                    )
+                    await self.resume(project_id, next_step)
+
+    async def _recover_current_step(self, project_id: str) -> Optional[PipelineStep]:
+        """从数据库恢复项目的当前 Pipeline 步骤。"""
+        # 旧版确认值到对应 PipelineStep 的映射
+        CONFIRMED_STEP_MAP = {
+            "characters_confirmed": PipelineStep.CHARACTER_EXTRACTION,
+            "storyboard_confirmed": PipelineStep.STORYBOARD_GENERATION,
+        }
+
+        conn = await get_connection()
+        try:
+            cursor = await conn.execute(
+                "SELECT current_step FROM projects WHERE id = ?", (project_id,)
+            )
+            row = await cursor.fetchone()
+            if row and row[0]:
+                step_value = row[0]
+                # 尝试匹配 PipelineStep 枚举
+                for step in PipelineStep:
+                    if step.value == step_value:
+                        return step
+                # 兼容旧版 'characters_confirmed' / 'storyboard_confirmed' 值
+                if step_value in CONFIRMED_STEP_MAP:
+                    return CONFIRMED_STEP_MAP[step_value]
+            return None
+        finally:
+            await conn.close()
 
     async def _run_pipeline(self, project_id: str, from_step: PipelineStep) -> None:
         """执行 Pipeline 的核心循环。
@@ -547,6 +593,9 @@ class PipelineEngine:
                     "step": step.value,
                     "progress": (i + 1) / len(STEP_ORDER),
                 })
+
+                # 更新内存中的进度（步骤完成后进度应前进到下一步位置）
+                self._progress[project_id] = (i + 1) / len(STEP_ORDER)
 
                 logger.info("Pipeline 步骤完成: %s (project=%s)", step.value, project_id)
 

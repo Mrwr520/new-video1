@@ -218,7 +218,7 @@ class LLMService:
         self,
         api_url: str = "https://api.openai.com/v1",
         api_key: str = "",
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-5",
         timeout: float = 120.0,
         max_retries: int = 3,
         client: Optional[httpx.AsyncClient] = None,
@@ -248,6 +248,8 @@ class LLMService:
     async def _call_llm(self, messages: list[dict]) -> str:
         """调用 LLM API，返回助手回复文本。
 
+        优先使用 streaming 模式（某些第三方 API 强制要求），
+        如果 streaming 失败则回退到非 streaming 模式。
         包含重试逻辑：超时和 5xx 错误自动重试。
         """
         client = await self._get_client()
@@ -262,18 +264,25 @@ class LLMService:
             "model": self.model,
             "messages": messages,
             "temperature": 0.7,
+            "stream": True,
         }
 
         last_error: Optional[Exception] = None
         for attempt in range(self.max_retries):
             try:
-                response = await client.post(url, json=payload, headers=headers)
+                # 尝试 streaming 模式
+                content = await self._call_llm_stream(client, url, headers, payload)
+                if content:
+                    return content
+
+                # 如果 streaming 返回空，回退到非 streaming
+                payload_no_stream = {**payload, "stream": False}
+                response = await client.post(url, json=payload_no_stream, headers=headers)
 
                 if response.status_code == 200:
                     data = response.json()
                     return self._extract_content(data)
 
-                # 可重试的状态码
                 if response.status_code >= 500 or response.status_code == 429:
                     last_error = LLMApiError(
                         f"LLM API 返回错误状态码: {response.status_code}",
@@ -285,7 +294,6 @@ class LLMService:
                     )
                     continue
 
-                # 不可重试的客户端错误
                 raise LLMApiError(
                     f"LLM API 返回错误: {response.status_code} - {response.text}",
                     status_code=response.status_code,
@@ -304,10 +312,57 @@ class LLMService:
             except Exception as e:
                 raise LLMServiceError(f"LLM API 调用异常: {e}")
 
-        # 所有重试都失败
         if last_error:
             raise last_error
         raise LLMServiceError("LLM API 调用失败，已耗尽重试次数")
+
+    async def _call_llm_stream(
+        self, client: httpx.AsyncClient, url: str, headers: dict, payload: dict
+    ) -> str:
+        """使用 streaming 模式调用 LLM API，拼接所有 delta 内容。"""
+        full_content = ""
+        try:
+            async with client.stream(
+                "POST", url, json=payload, headers=headers
+            ) as resp:
+                if resp.status_code != 200:
+                    body = await resp.aread()
+                    body_text = body.decode("utf-8", errors="replace")
+                    # 如果是 "must use stream" 类错误，说明不支持非 stream，
+                    # 但这里已经是 stream 模式了，所以是真正的错误
+                    if resp.status_code >= 500 or resp.status_code == 429:
+                        raise LLMApiError(
+                            f"LLM API streaming 错误: {resp.status_code}",
+                            status_code=resp.status_code,
+                        )
+                    raise LLMApiError(
+                        f"LLM API 返回错误: {resp.status_code} - {body_text}",
+                        status_code=resp.status_code,
+                    )
+
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            full_content += content
+                    except json.JSONDecodeError:
+                        continue
+        except (LLMApiError, LLMTimeoutError):
+            raise
+        except httpx.TimeoutException:
+            raise
+        except Exception as e:
+            logger.warning("Streaming 调用异常: %s", e)
+            return ""
+
+        return full_content
 
     @staticmethod
     def _extract_content(response_data: dict) -> str:

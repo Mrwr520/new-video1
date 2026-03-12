@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+
+# Node
+node_modules/
+
+# Build outputs
+dist/
+out/
+build/
+
+# Data & cache
+backend/data/
+backend/projects/
+*.db
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

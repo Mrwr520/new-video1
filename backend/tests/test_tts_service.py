@@ -217,8 +217,8 @@ class TestChatTTSAdapter:
 # 预留适配器骨架测试
 # ============================================================
 
-class TestSkeletonAdapters:
-    """测试预留的收费模型适配器骨架"""
+class TestPaidAdapters:
+    """测试收费模型适配器"""
 
     @pytest.mark.parametrize("adapter_cls,expected_name,expected_paid", [
         (FishSpeechAdapter, "fish-speech", True),
@@ -240,9 +240,10 @@ class TestSkeletonAdapters:
         VolcEngineTTSAdapter,
     ])
     @pytest.mark.asyncio
-    async def test_generate_speech_raises_not_implemented(self, adapter_cls):
+    async def test_generate_speech_raises_without_api_key(self, adapter_cls):
+        """未配置 API Key 时应抛出 TTSError"""
         adapter = adapter_cls()
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(TTSError):
             await adapter.generate_speech("测试", "voice-1")
 
     @pytest.mark.parametrize("adapter_cls", [
@@ -252,10 +253,14 @@ class TestSkeletonAdapters:
         VolcEngineTTSAdapter,
     ])
     @pytest.mark.asyncio
-    async def test_list_voices_returns_empty(self, adapter_cls):
+    async def test_list_voices_returns_defaults(self, adapter_cls):
+        """未配置 API Key 时应返回预定义的默认语音列表"""
         adapter = adapter_cls()
         voices = await adapter.list_voices()
-        assert voices == []
+        assert isinstance(voices, list)
+        # 所有适配器都有预定义的默认语音
+        for v in voices:
+            assert isinstance(v, VoiceInfo)
 
     @pytest.mark.parametrize("adapter_cls", [
         FishSpeechAdapter,

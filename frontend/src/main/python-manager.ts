@@ -68,12 +68,30 @@ export class PythonManager extends EventEmitter {
     return this.status
   }
 
-  /** 启动 Python 后端 (Requirement 9.1) */
+  /** 是否是外部启动的后端（非本进程管理） */
+  private externalBackend = false
+
+  /** 启动 Python 后端 (Requirement 9.1)
+   *
+   * 先检查端口上是否已有后端在运行，如果有则直接复用（外部后端模式），
+   * 避免端口冲突导致反复弹出错误对话框。
+   */
   async start(): Promise<void> {
     if (this.status === 'running') {
       return
     }
 
+    // 先检查是否已有后端在运行（可能是手动启动的或上次未正常关闭的）
+    const alreadyRunning = await this.healthCheck()
+    if (alreadyRunning) {
+      console.log('检测到后端已在运行，直接复用')
+      this.externalBackend = true
+      this.setStatus('running')
+      this.startHealthCheckPolling()
+      return
+    }
+
+    this.externalBackend = false
     this.setStatus('starting')
     this.stderrBuffer = ''
     this.consecutiveFailures = 0
@@ -188,6 +206,12 @@ export class PythonManager extends EventEmitter {
   /** 停止 Python 后端 (Requirement 9.2) */
   async stop(): Promise<void> {
     this.stopHealthCheck()
+
+    // 外部后端不由我们管理，不需要杀进程
+    if (this.externalBackend) {
+      this.setStatus('stopped')
+      return
+    }
 
     if (!this.process) {
       this.setStatus('stopped')

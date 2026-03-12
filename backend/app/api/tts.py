@@ -31,11 +31,21 @@ _tts_service: Optional[TTSService] = None
 
 
 def get_tts_service() -> TTSService:
-    """获取或创建 TTSService 单例"""
+    """获取或创建 TTSService 单例（带配置注入）"""
     global _tts_service
     if _tts_service is None:
-        _tts_service = TTSService()
+        from app.api.config import _load_config
+        from app.database import get_db_path
+        config = _load_config().model_dump()
+        projects_dir = get_db_path().parent / "projects"
+        _tts_service = TTSService(projects_dir=projects_dir, config=config)
     return _tts_service
+
+
+def reset_tts_service() -> None:
+    """重置 TTS 服务单例，下次调用 get_tts_service 时会重新创建（配置变更后调用）"""
+    global _tts_service
+    _tts_service = None
 
 
 # ============================================================

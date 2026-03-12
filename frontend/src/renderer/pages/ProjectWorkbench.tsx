@@ -150,72 +150,51 @@ export function ProjectWorkbench(): JSX.Element {
       <p>项目 ID: {id}</p>
 
       {/* Pipeline 控制 */}
-      <div className="pipeline-controls" style={{ margin: '16px 0' }}>
+      <div className="pipeline-controls">
         {!isRunning ? (
           <button onClick={handleStart} disabled={isRunning}>
             启动 Pipeline
           </button>
         ) : (
-          <button onClick={handleCancel}>取消 Pipeline</button>
+          <button className="btn-danger" onClick={handleCancel}>取消 Pipeline</button>
         )}
       </div>
 
       {/* 进度条 */}
       {(isRunning || progress > 0) && (
-        <div className="pipeline-progress" style={{ margin: '16px 0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div className="pipeline-progress">
+          <div className="pipeline-progress-header">
             <span>{stepDetail || '准备中...'}</span>
             <span>{progressPercent}%</span>
           </div>
-          <div
-            style={{
-              width: '100%',
-              height: 20,
-              backgroundColor: '#e0e0e0',
-              borderRadius: 4,
-              overflow: 'hidden',
-            }}
-          >
+          <div className="pipeline-progress-track">
             <div
-              style={{
-                width: `${progressPercent}%`,
-                height: '100%',
-                backgroundColor: error ? '#e53935' : '#4caf50',
-                transition: 'width 0.3s ease',
-              }}
+              className={`pipeline-progress-bar ${error ? 'pipeline-progress-bar--error' : ''}`}
+              style={{ width: `${progressPercent}%` }}
             />
           </div>
           {estimatedRemaining > 0 && isRunning && (
-            <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+            <div className="pipeline-progress-eta">
               预计剩余: {formatTime(estimatedRemaining)}
             </div>
           )}
         </div>
       )}
 
-      {/* 步骤导航 - 根据当前 Pipeline 状态显示操作指引 */}
+      {/* 步骤导航 */}
       {currentStep && (
-        <div style={{ margin: '12px 0', padding: 12, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-          <div style={{ fontWeight: 'bold', marginBottom: 8 }}>工作流进度</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="pipeline-steps">
+          <div className="pipeline-steps-title">工作流进度</div>
+          <div className="pipeline-steps-list">
             {Object.entries(STEP_LABELS).map(([step, label]) => {
               const stepKeys = Object.keys(STEP_LABELS)
               const currentIdx = stepKeys.indexOf(currentStep || '')
               const stepIdx = stepKeys.indexOf(step)
               const isDone = stepIdx < currentIdx || progress >= 1
               const isCurrent = step === currentStep
+              const cls = isDone ? 'badge badge-success' : isCurrent ? 'badge badge-info' : 'badge'
               return (
-                <span
-                  key={step}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 12,
-                    fontSize: 13,
-                    backgroundColor: isDone ? '#c8e6c9' : isCurrent ? '#bbdefb' : '#e0e0e0',
-                    color: isDone ? '#2e7d32' : isCurrent ? '#1565c0' : '#757575',
-                    fontWeight: isCurrent ? 'bold' : 'normal',
-                  }}
-                >
+                <span key={step} className={cls} style={isCurrent ? { fontWeight: 600 } : undefined}>
                   {isDone ? '✓ ' : isCurrent ? '▶ ' : ''}{label}
                 </span>
               )
@@ -226,7 +205,7 @@ export function ProjectWorkbench(): JSX.Element {
 
       {/* 等待确认提示 */}
       {isWaiting && (
-        <div style={{ padding: 8, backgroundColor: '#fff3e0', borderRadius: 4, margin: '8px 0' }}>
+        <div className="alert alert-warning">
           {currentStep === 'character_extraction' && (
             <span>角色提取完成，请前往 <Link to={`/project/${id}/chars`}>角色管理</Link> 确认角色信息后继续。</span>
           )}
@@ -241,28 +220,25 @@ export function ProjectWorkbench(): JSX.Element {
 
       {/* 错误提示 */}
       {error && (
-        <div style={{ padding: 8, backgroundColor: '#ffebee', color: '#c62828', borderRadius: 4, margin: '8px 0' }}>
+        <div className="alert alert-danger">
           错误: {error}
         </div>
       )}
 
       {/* 通知 */}
       {notification && !error && (
-        <div style={{ padding: 8, backgroundColor: '#e8f5e9', borderRadius: 4, margin: '8px 0' }}>
+        <div className="alert alert-success">
           {notification}
         </div>
       )}
 
       <nav>
         <Link to={`/project/${id}/text`}>文本输入</Link>
-        {' | '}
         <Link to={`/project/${id}/chars`}>角色管理</Link>
-        {' | '}
         <Link to={`/project/${id}/story`}>分镜编辑</Link>
-        {' | '}
         <Link to={`/project/${id}/preview`}>视频预览</Link>
       </nav>
-      <Link to="/">返回项目列表</Link>
+      <Link to="/" className="back-link">← 返回项目列表</Link>
     </div>
   )
 }
