@@ -202,8 +202,37 @@ async def regenerate_keyframe(project_id: str, scene_id: str):
         # 获取模板风格配置
         style_config = _get_style_config(project_row["template_id"])
 
+        # 加载配置并根据模式选择服务
+        from app.api.config import _load_config
+        from app.services.local_image_service import LocalImageGeneratorService
+        from app.services.mock_image_service import MockImageGeneratorService
+        from pathlib import Path
+        
+        config = _load_config()
+        image_gen_mode = config.image_gen_mode
+        projects_root = Path(__file__).parent.parent.parent / "data" / "projects"
+        
+        logger.info(f"重新生成关键帧 - 模式: {image_gen_mode}")
+        
+        # 根据模式选择服务
+        if image_gen_mode == "local":
+            service = LocalImageGeneratorService(
+                gpu_device=config.gpu_device,
+                projects_dir=projects_root,
+            )
+        elif image_gen_mode == "mock":
+            service = MockImageGeneratorService(
+                projects_dir=projects_root,
+                delay=1.0,
+            )
+        else:  # api
+            service = ImageGeneratorService(
+                api_url=config.image_gen_api_url or "https://api.openai.com/v1",
+                api_key=config.image_gen_api_key or "",
+                projects_dir=projects_root,
+            )
+
         # 调用图像生成服务
-        service = ImageGeneratorService()
         try:
             keyframe_path = await service.regenerate_keyframe(
                 scene=scene,

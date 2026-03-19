@@ -132,7 +132,8 @@ export function StoryboardPage(): JSX.Element {
   }
 
   const getKeyframeUrl = (keyframePath: string): string => {
-    const match = keyframePath.match(/projects[\\/](.+)/)
+    // 匹配 projects/{project_id}/ 之后的路径部分
+    const match = keyframePath.match(/projects[\\/][^\\\/]+[\\/](.+)/)
     if (match) {
       return `http://localhost:8000/api/projects/${projectId}/files/${match[1].replace(/\\/g, '/')}`
     }
@@ -140,7 +141,8 @@ export function StoryboardPage(): JSX.Element {
   }
 
   const getVideoUrl = (videoPath: string): string => {
-    const match = videoPath.match(/projects[\\/](.+)/)
+    // 匹配 projects/{project_id}/ 之后的路径部分
+    const match = videoPath.match(/projects[\\/][^\\\/]+[\\/](.+)/)
     if (match) {
       return `http://localhost:8000/api/projects/${projectId}/files/${match[1].replace(/\\/g, '/')}`
     }

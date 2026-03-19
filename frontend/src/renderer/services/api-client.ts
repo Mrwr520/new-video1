@@ -243,6 +243,46 @@ export interface GPUInfo {
   error?: string
 }
 
+// 环境检测相关类型
+export interface PackageStatus {
+  name: string
+  display_name: string
+  installed: boolean
+  version: string | null
+  required: boolean
+  description: string
+}
+
+export interface NvidiaSmiGPU {
+  index: number
+  name: string
+  driver_version: string
+  total_memory_mb: number
+  free_memory_mb: number
+  used_memory_mb: number
+  cuda_version: string
+}
+
+export interface EnvironmentCheckResponse {
+  python_version: string
+  python_path: string
+  gpu_detected: boolean
+  gpu_info: NvidiaSmiGPU[] | null
+  gpu_error: string | null
+  nvidia_driver_version: string | null
+  cuda_version_from_driver: string | null
+  packages: PackageStatus[]
+  all_installed: boolean
+  recommended_torch_index_url: string | null
+}
+
+export interface InstallStatusResponse {
+  running: boolean
+  log: string[]
+  success: boolean | null
+  message: string
+}
+
 // API 客户端类
 export class ApiClient {
   private baseUrl: string
@@ -499,6 +539,28 @@ export class ApiClient {
   /** 获取 GPU 信息 */
   async getGPUInfo(): Promise<GPUInfo> {
     return this.request<GPUInfo>('/api/gpu')
+  }
+
+  // ----------------------------------------------------------
+  // 环境检测与依赖安装
+  // ----------------------------------------------------------
+
+  /** 检测 Python 环境（GPU、依赖包） */
+  async checkEnvironment(): Promise<EnvironmentCheckResponse> {
+    return this.request<EnvironmentCheckResponse>('/api/environment/check')
+  }
+
+  /** 安装缺失依赖 */
+  async installPackages(packages?: string[], cudaVersion?: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/environment/install', {
+      method: 'POST',
+      body: JSON.stringify({ packages: packages || [], cuda_version: cudaVersion || null })
+    })
+  }
+
+  /** 查询安装进度 */
+  async getInstallStatus(): Promise<InstallStatusResponse> {
+    return this.request<InstallStatusResponse>('/api/environment/install-status')
   }
 }
 

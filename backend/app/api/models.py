@@ -4,11 +4,15 @@
 前端模型管理页面通过这些 API 展示模型状态和下载进度。
 """
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.services.model_manager import get_model_manager, ModelStatus
 
 router = APIRouter(prefix="/api")
+logger = logging.getLogger(__name__)
 
 
 @router.get("/models")
@@ -35,7 +39,7 @@ async def get_model(model_id: str) -> dict:
 
 @router.post("/models/{model_id}/download")
 async def download_model(model_id: str) -> dict:
-    """触发模型下载"""
+    """触发模型下载（非阻塞，后台执行）"""
     manager = get_model_manager()
     model = manager.get_model(model_id)
     if model is None:
@@ -47,11 +51,17 @@ async def download_model(model_id: str) -> dict:
     if model.status in (ModelStatus.DOWNLOADED, ModelStatus.LOADED):
         return {"message": "模型已下载", "status": model.status.value}
 
-    try:
-        await manager.download_model(model_id)
-        return {"message": "下载完成", "status": "downloaded"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # 后台启动下载，立即返回
+    async def _bg_download():
+        try:
+            await manager.download_model(model_id)
+        except Exception as e:
+            logger.error("后台下载模型失败 %s: %s", model_id, e)
+
+    import asyncio
+    asyncio.create_task(_bg_download())
+
+    return {"message": "下载已开始", "status": "downloading"}
 
 
 @router.delete("/models/{model_id}")

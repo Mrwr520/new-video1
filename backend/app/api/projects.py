@@ -206,3 +206,46 @@ async def submit_text(project_id: str, req: SubmitTextRequest):
         )
     finally:
         await conn.close()
+
+
+from fastapi.responses import FileResponse
+
+
+@router.get("/{project_id}/files/{file_path:path}")
+async def get_project_file(project_id: str, file_path: str):
+    """获取项目文件（图片、音频、视频等）
+    
+    Args:
+        project_id: 项目 ID
+        file_path: 相对于项目目录的文件路径，例如 "keyframes/scene_xxx.png"
+    
+    Returns:
+        文件响应
+    """
+    # 验证项目存在
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute("SELECT id FROM projects WHERE id = ?", (project_id,))
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="项目不存在")
+    finally:
+        await conn.close()
+    
+    # 构建文件路径
+    project_dir = _get_project_dir(project_id)
+    full_path = project_dir / file_path
+    
+    # 安全检查：确保文件在项目目录内
+    try:
+        full_path = full_path.resolve()
+        project_dir = project_dir.resolve()
+        if not str(full_path).startswith(str(project_dir)):
+            raise HTTPException(status_code=403, detail="禁止访问")
+    except Exception:
+        raise HTTPException(status_code=400, detail="无效的文件路径")
+    
+    # 检查文件是否存在
+    if not full_path.exists() or not full_path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    return FileResponse(str(full_path))

@@ -191,7 +191,12 @@ export function ModelManagePage(): JSX.Element {
                     disabled={!!actionLoading[model.id] || !gpuInfo?.available}
                     aria-label={`下载 ${model.name}`}
                   >
-                    {actionLoading[model.id] ? '处理中...' : '下载模型'}
+                    {actionLoading[model.id] 
+                      ? '处理中...' 
+                      : model.download_progress > 0 
+                        ? `继续下载 (${Math.round(model.download_progress * 100)}%)`
+                        : '下载模型'
+                    }
                   </button>
                 )}
                 {(model.status === 'downloaded' || model.status === 'error') && (
@@ -219,6 +224,8 @@ export function ModelManagePage(): JSX.Element {
         <h2>使用说明</h2>
         <ul>
           <li>首次使用需要下载模型，下载完成后即可离线使用</li>
+          <li>支持断点续传：下载中断后可继续下载，不会重新开始</li>
+          <li>关闭窗口后下载会暂停，下次打开可点击"继续下载"按钮恢复</li>
           <li>图像生成模型和视频生成模型会交替使用 GPU，不会同时占用</li>
           <li>如果显存不足，可以在设置中切换图像生成为"远程 API"模式</li>
           <li>模型文件缓存在用户目录下，卸载软件不会自动删除</li>

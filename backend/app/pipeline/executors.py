@@ -213,12 +213,17 @@ async def execute_storyboard_generation(project_id: str) -> None:
 async def execute_keyframe_generation(project_id: str) -> None:
     """调用图像生成服务为每个分镜生成关键帧。
 
-    根据配置 image_gen_mode 选择本地 SDXL 或远程 API。
+    根据配置 image_gen_mode 选择：
+    - "local": 本地 SDXL 模型
+    - "api": 远程 API（OpenAI/Replicate 等）
+    - "mock": 模拟生成（用于测试和演示）
+    
     本地模式下，生成完所有关键帧后自动卸载模型释放显存，
     为后续视频生成腾出 GPU 空间。
     """
     from app.services.image_service import ImageGeneratorService
     from app.services.local_image_service import LocalImageGeneratorService
+    from app.services.mock_image_service import MockImageGeneratorService
 
     project = await _get_project(project_id)
     template = _get_template(project.get("template_id", "builtin-anime"))
@@ -230,16 +235,31 @@ async def execute_keyframe_generation(project_id: str) -> None:
 
     config = _load_config()
     projects_root = _get_projects_root()
-    image_gen_mode = config.get("image_gen_mode", "local")
+    image_gen_mode = config.get("image_gen_mode", "mock")  # 默认使用 mock 模式
+    
+    # 添加详细日志
+    logger.info("=" * 60)
+    logger.info("关键帧生成配置:")
+    logger.info(f"  image_gen_mode: {image_gen_mode}")
+    logger.info(f"  image_gen_api_url: {config.get('image_gen_api_url', 'N/A')}")
+    logger.info(f"  image_gen_api_key: {'***' if config.get('image_gen_api_key') else 'N/A'}")
+    logger.info("=" * 60)
 
     # 根据模式选择服务
-    use_local = image_gen_mode == "local"
-    if use_local:
+    if image_gen_mode == "local":
+        logger.info("使用本地 SDXL 模型生成关键帧")
         image_service = LocalImageGeneratorService(
             gpu_device=config.get("gpu_device", 0),
             projects_dir=projects_root,
         )
-    else:
+    elif image_gen_mode == "mock":
+        logger.info("使用模拟模式生成关键帧（测试/演示）")
+        image_service = MockImageGeneratorService(
+            projects_dir=projects_root,
+            delay=1.0,  # 模拟生成延迟 1 秒
+        )
+    else:  # api
+        logger.info("使用远程 API 生成关键帧")
         image_service = ImageGeneratorService(
             api_url=config.get("image_gen_api_url") or "https://api.openai.com/v1",
             api_key=config.get("image_gen_api_key", ""),
@@ -248,7 +268,7 @@ async def execute_keyframe_generation(project_id: str) -> None:
 
     try:
         # 本地模式需要先加载模型
-        if use_local:
+        if image_gen_mode == "local":
             await image_service.load_model()
 
         conn = await get_connection()
@@ -294,7 +314,13 @@ async def execute_keyframe_generation(project_id: str) -> None:
 # ============================================================
 
 async def execute_video_generation(project_id: str) -> None:
-    """调用 FramePackService 为每个分镜生成视频片段。"""
+    """调用 FramePackService 为每个分镜生成视频片段。
+    
+    使用 HunyuanVideo-I2V 官方推荐配置：
+    - 24 FPS（官方推荐）
+    - 最长 5 秒
+    - 稳定模式（50 steps）获得最佳质量
+    """
     from app.services.framepack_service import FramePackService
 
     project = await _get_project(project_id)
@@ -307,17 +333,21 @@ async def execute_video_generation(project_id: str) -> None:
     config = _load_config()
     projects_root = _get_projects_root()
 
+    # 获取视频生成模式（从配置或使用默认值）
+    video_mode = config.get("video_gen_mode", "stable")  # stable, dynamic, fast
+    
     framepack = FramePackService(
         gpu_device=config.get("gpu_device", 0),
         projects_dir=projects_root,
+        mode=video_mode,  # 传入生成模式
     )
 
     try:
         await framepack.load_model()
 
         motion_style = template.motion_style
-        duration = motion_style.get("duration", 5.0)
-        fps = motion_style.get("fps", 30)
+        duration = min(motion_style.get("duration", 5.0), 5.0)  # 最大 5 秒
+        fps = motion_style.get("fps", 24)  # 官方推荐 24 FPS
 
         conn = await get_connection()
         try:
@@ -327,13 +357,14 @@ async def execute_video_generation(project_id: str) -> None:
                     logger.warning("分镜 %s 没有关键帧，跳过视频生成", scene_row["id"])
                     continue
 
-                motion_prompt = scene_row.get("motion_prompt", "") or ""
+                motion_prompt = scene_row.get("motion_prompt", "") or "smooth camera movement"
 
                 video_path = await framepack.generate_video(
                     image_path=keyframe_path,
                     prompt=motion_prompt,
                     duration=duration,
                     fps=fps,
+                    # mode 参数可以在这里覆盖，例如动作场景使用 dynamic 模式
                 )
 
                 await conn.execute(

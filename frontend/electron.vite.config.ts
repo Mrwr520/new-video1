@@ -15,6 +15,11 @@ export default defineConfig({
         '@': resolve('src/renderer')
       }
     },
-    plugins: [react()]
+    plugins: [react()],
+    build: {
+      rollupOptions: {
+        external: ['crypto']
+      }
+    }
   }
 })

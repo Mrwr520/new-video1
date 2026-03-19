@@ -166,13 +166,72 @@ class ModelManager:
                 estimated_size_gb=info.estimated_size_gb,
                 min_vram_gb=info.min_vram_gb,
             )
-            # 检查是否已下载
+            # 检查是否已下载完成
             local_path = self.cache_dir / model_id
-            if local_path.exists() and any(local_path.iterdir()):
+            if self._is_model_complete(local_path):
                 model.status = ModelStatus.DOWNLOADED
                 model.local_path = str(local_path)
                 model.download_progress = 1.0
+            elif local_path.exists() and any(local_path.iterdir()):
+                # 目录存在但下载未完成，标记为部分下载
+                model.status = ModelStatus.NOT_DOWNLOADED
+                model.local_path = str(local_path)
+                # 计算已下载的进度
+                try:
+                    current_size = self._get_dir_size(local_path)
+                    estimated_size = int(info.estimated_size_gb * (1024 ** 3))
+                    if estimated_size > 0:
+                        model.download_progress = min(current_size / estimated_size, 0.99)
+                except Exception:
+                    model.download_progress = 0.0
             self._models[model_id] = model
+
+    # ----------------------------------------------------------
+    # 辅助方法
+    # ----------------------------------------------------------
+
+    def _is_model_complete(self, model_path: Path) -> bool:
+        """检查模型是否下载完成。
+        
+        通过检查是否存在 HuggingFace 的标记文件来判断。
+        """
+        if not model_path.exists():
+            return False
+        
+        # 检查是否有文件（空目录视为未完成）
+        if not any(model_path.iterdir()):
+            return False
+        
+        # 检查关键文件是否存在
+        # HuggingFace 模型通常包含这些文件
+        key_files = [
+            "config.json",
+            "model_index.json",
+            ".gitattributes",
+        ]
+        
+        # 至少要有一个关键配置文件
+        has_config = any((model_path / f).exists() for f in key_files)
+        if not has_config:
+            return False
+        
+        # 检查是否有 .incomplete 标记文件（自定义标记）
+        incomplete_marker = model_path / ".incomplete"
+        if incomplete_marker.exists():
+            return False
+        
+        return True
+
+    def _get_dir_size(self, path: Path) -> int:
+        """计算目录总大小（字节）"""
+        total = 0
+        for item in path.rglob("*"):
+            if item.is_file():
+                try:
+                    total += item.stat().st_size
+                except OSError:
+                    pass
+        return total
 
     # ----------------------------------------------------------
     # 查询接口
@@ -232,11 +291,19 @@ class ModelManager:
         try:
             local_path = self.cache_dir / model_id
             local_path.mkdir(parents=True, exist_ok=True)
+            
+            # 创建未完成标记文件
+            incomplete_marker = local_path / ".incomplete"
+            incomplete_marker.touch()
 
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 None, self._download_sync, model_id, model.hf_repo_id, str(local_path)
             )
+
+            # 下载成功，删除未完成标记
+            if incomplete_marker.exists():
+                incomplete_marker.unlink()
 
             model.status = ModelStatus.DOWNLOADED
             model.download_progress = 1.0
@@ -258,18 +325,56 @@ class ModelManager:
                 "huggingface_hub 未安装，请运行: pip install huggingface_hub"
             )
 
+        import threading
+
         model = self._models[model_id]
 
-        def progress_callback(current: int, total: int) -> None:
-            if total > 0:
-                model.download_progress = current / total
+        # 获取仓库真实大小
+        total_bytes = int(model.estimated_size_gb * (1024 ** 3))
+        try:
+            from huggingface_hub import HfApi
+            info = HfApi().repo_info(repo_id, repo_type="model")
+            if info.siblings:
+                real = sum((s.size or 0) for s in info.siblings)
+                if real > 0:
+                    total_bytes = real
+        except Exception:
+            pass
 
-        # snapshot_download 支持断点续传，会自动跳过已下载的文件
-        snapshot_download(
-            repo_id=repo_id,
-            local_dir=local_dir,
-            local_dir_use_symlinks=False,
-        )
+        stop_event = threading.Event()
+
+        def _dir_size(path: str) -> int:
+            total = 0
+            for dirpath, _, filenames in os.walk(path):
+                for fname in filenames:
+                    try:
+                        total += os.path.getsize(os.path.join(dirpath, fname))
+                    except OSError:
+                        pass
+            return total
+
+        def _monitor():
+            while not stop_event.is_set():
+                try:
+                    current = _dir_size(local_dir)
+                    if total_bytes > 0 and current > 0:
+                        model.download_progress = min(current / total_bytes, 0.99)
+                except Exception:
+                    pass
+                stop_event.wait(3.0)
+
+        monitor = threading.Thread(target=_monitor, daemon=True)
+        monitor.start()
+
+        try:
+            snapshot_download(
+                repo_id=repo_id,
+                local_dir=local_dir,
+                local_dir_use_symlinks=False,
+            )
+        finally:
+            stop_event.set()
+            monitor.join(timeout=5)
 
     async def delete_model(self, model_id: str) -> bool:
         """删除本地缓存的模型文件"""

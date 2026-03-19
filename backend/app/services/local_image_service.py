@@ -121,12 +121,23 @@ class LocalImageGeneratorService:
 
     def _load_sync(self, model_path: str) -> None:
         """同步加载模型"""
-        self.pipeline = StableDiffusionXLPipeline.from_pretrained(
-            model_path,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16",
-        )
+        try:
+            # 尝试加载 fp16 变体
+            self.pipeline = StableDiffusionXLPipeline.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+                variant="fp16",
+            )
+        except Exception as e:
+            logger.warning("加载 fp16 变体失败，尝试加载默认模型: %s", e)
+            # 降级到默认加载方式
+            self.pipeline = StableDiffusionXLPipeline.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+            )
+        
+        # 启用 CPU offload 以节省显存
         self.pipeline.enable_model_cpu_offload(gpu_id=self.gpu_device)
 
     async def unload_model(self) -> None:

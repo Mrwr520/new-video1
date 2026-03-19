@@ -5,7 +5,9 @@ import {
   type AppConfig,
   type AppConfigUpdate,
   type ModelInfo,
-  type GPUInfo
+  type GPUInfo,
+  type EnvironmentCheckResponse,
+  type InstallStatusResponse
 } from '../services/api-client'
 
 type SaveStatus = 'idle' | 'saving' | 'success' | 'error'
@@ -23,6 +25,12 @@ export function SettingsPage(): JSX.Element {
   const [gpuInfo, setGpuInfo] = useState<GPUInfo | null>(null)
   const [cacheSizeGb, setCacheSizeGb] = useState(0)
   const [modelActionLoading, setModelActionLoading] = useState<Record<string, boolean>>({})
+
+  // 环境检测状态
+  const [envCheck, setEnvCheck] = useState<EnvironmentCheckResponse | null>(null)
+  const [envLoading, setEnvLoading] = useState(false)
+  const [installStatus, setInstallStatus] = useState<InstallStatusResponse | null>(null)
+  const [installing, setInstalling] = useState(false)
 
   // 表单字段
   const [pythonPath, setPythonPath] = useState('')
@@ -51,6 +59,8 @@ export function SettingsPage(): JSX.Element {
         apiClient.getGPUInfo().catch(() => ({ available: false, error: 'GPU 检测失败' } as GPUInfo))
       ])
       setConfig(data)
+      // 同时加载环境检测
+      apiClient.checkEnvironment().then(setEnvCheck).catch(() => {})
       setPythonPath(data.python_path)
       setGpuDevice(data.gpu_device)
       setBackendPort(data.backend_port)
@@ -91,6 +101,44 @@ export function SettingsPage(): JSX.Element {
     }, 3000)
     return () => clearInterval(timer)
   }, [models])
+
+  // 安装进度轮询
+  useEffect(() => {
+    if (!installing) return
+    const timer = setInterval(async () => {
+      try {
+        const status = await apiClient.getInstallStatus()
+        setInstallStatus(status)
+        if (!status.running) {
+          setInstalling(false)
+          // 安装完成后刷新环境检测
+          apiClient.checkEnvironment().then(setEnvCheck).catch(() => {})
+          apiClient.getGPUInfo().then(setGpuInfo).catch(() => {})
+        }
+      } catch { /* ignore */ }
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [installing])
+
+  const handleInstallAll = async (): Promise<void> => {
+    setInstalling(true)
+    setInstallStatus({ running: true, log: [], success: null, message: '准备安装...' })
+    try {
+      await apiClient.installPackages([], envCheck?.recommended_torch_index_url?.split('/').pop() || undefined)
+    } catch (err) {
+      setInstalling(false)
+      setInstallStatus({ running: false, log: [], success: false, message: err instanceof Error ? err.message : '启动安装失败' })
+    }
+  }
+
+  const handleRefreshEnv = async (): Promise<void> => {
+    setEnvLoading(true)
+    try {
+      const env = await apiClient.checkEnvironment()
+      setEnvCheck(env)
+    } catch { /* ignore */ }
+    setEnvLoading(false)
+  }
 
   const buildUpdate = (): AppConfigUpdate => {
     if (!config) return {}
@@ -261,7 +309,31 @@ export function SettingsPage(): JSX.Element {
       {/* ========== GPU 环境信息 ========== */}
       <section className="settings-section gpu-info-section" aria-label="GPU 环境">
         <h2>🖥️ GPU 环境 <Link to="/models" style={{ fontSize: '0.8rem', fontWeight: 'normal', marginLeft: 12 }}>模型管理详情 →</Link></h2>
-        {gpuInfo?.available ? (
+
+        {envCheck ? (
+          <div className="gpu-details">
+            {envCheck.gpu_detected && envCheck.gpu_info ? (
+              <>
+                {envCheck.gpu_info.map(dev => (
+                  <div key={dev.index} className="gpu-device-row">
+                    <span className="gpu-name">🟢 {dev.name}</span>
+                    <span className="gpu-memory">
+                      {Math.round(dev.free_memory_mb / 1024 * 10) / 10} GB 可用 / {Math.round(dev.total_memory_mb / 1024 * 10) / 10} GB 总计
+                    </span>
+                  </div>
+                ))}
+                <small>
+                  NVIDIA 驱动 {envCheck.nvidia_driver_version} · CUDA {envCheck.cuda_version_from_driver} · Python {envCheck.python_version}
+                </small>
+              </>
+            ) : (
+              <div className="gpu-unavailable">
+                <p>⚠️ {envCheck.gpu_error || '未检测到 NVIDIA GPU'}</p>
+                <small>本地模型需要 NVIDIA GPU + CUDA 驱动。没有 GPU 请使用远程 API 模式。</small>
+              </div>
+            )}
+          </div>
+        ) : gpuInfo?.available ? (
           <div className="gpu-details">
             {gpuInfo.devices?.map(dev => (
               <div key={dev.index} className="gpu-device-row">
@@ -276,7 +348,68 @@ export function SettingsPage(): JSX.Element {
         ) : (
           <div className="gpu-unavailable">
             <p>⚠️ {gpuInfo?.error || 'GPU 不可用'}</p>
-            <small>本地模型需要 NVIDIA GPU + CUDA。没有 GPU 请使用远程 API 模式。</small>
+          </div>
+        )}
+
+        {/* 依赖包状态 */}
+        {envCheck && (
+          <div style={{ marginTop: 16 }}>
+            <h3 style={{ fontSize: '0.95rem', marginBottom: 8 }}>
+              📦 Python 依赖
+              {envCheck.all_installed
+                ? <span style={{ color: '#22c55e', marginLeft: 8 }}>✅ 全部就绪</span>
+                : <span style={{ color: '#ef4444', marginLeft: 8 }}>⚠️ 有缺失</span>}
+              <button type="button" onClick={handleRefreshEnv} disabled={envLoading}
+                style={{ marginLeft: 12, fontSize: '0.8rem', padding: '2px 8px' }}>
+                {envLoading ? '检测中...' : '🔄 重新检测'}
+              </button>
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+              {envCheck.packages.map(pkg => (
+                <div key={pkg.name} style={{
+                  padding: '6px 10px', borderRadius: 6,
+                  background: pkg.installed ? '#f0fdf4' : '#fef2f2',
+                  border: `1px solid ${pkg.installed ? '#bbf7d0' : '#fecaca'}`,
+                  fontSize: '0.85rem',
+                }}>
+                  <span>{pkg.installed ? '✅' : '❌'} {pkg.display_name}</span>
+                  {pkg.version && <span style={{ color: '#888', marginLeft: 4 }}>v{pkg.version}</span>}
+                  {!pkg.installed && pkg.required && <span style={{ color: '#ef4444', marginLeft: 4 }}>(必需)</span>}
+                </div>
+              ))}
+            </div>
+
+            {!envCheck.all_installed && (
+              <div style={{ marginTop: 12 }}>
+                {envCheck.recommended_torch_index_url && (
+                  <small style={{ display: 'block', marginBottom: 6, color: '#666' }}>
+                    检测到 CUDA {envCheck.cuda_version_from_driver}，将自动匹配 PyTorch CUDA 版本
+                  </small>
+                )}
+                <button type="button" onClick={handleInstallAll} disabled={installing}
+                  style={{ padding: '8px 24px', fontSize: '0.95rem', fontWeight: 600 }}>
+                  {installing ? '⏳ 安装中...' : '🚀 一键安装所有缺失依赖'}
+                </button>
+              </div>
+            )}
+
+            {/* 安装日志 */}
+            {installStatus && (installStatus.running || installStatus.log.length > 0) && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                    {installStatus.running ? '⏳ 安装进行中...' : installStatus.success ? '✅ 安装完成' : '❌ 安装失败'}
+                  </span>
+                  {installStatus.message && <span style={{ fontSize: '0.8rem', color: '#666' }}>{installStatus.message}</span>}
+                </div>
+                <pre style={{
+                  background: '#1e1e1e', color: '#d4d4d4', padding: 12, borderRadius: 6,
+                  fontSize: '0.75rem', maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap',
+                }}>
+                  {installStatus.log.slice(-50).join('\n') || '等待输出...'}
+                </pre>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -306,7 +439,7 @@ export function SettingsPage(): JSX.Element {
           {imageGenMode === 'local' && imageModel && (
             <div className="model-section">
               {renderModelCard(imageModel, '关键帧生成')}
-              {!gpuInfo?.available && (
+              {!gpuInfo?.available && !envCheck?.gpu_detected && (
                 <p className="warning-text">
                   ⚠️ 未检测到 GPU，本地模式可能无法正常工作。建议切换为远程 API 模式。
                 </p>
@@ -343,7 +476,7 @@ export function SettingsPage(): JSX.Element {
             需要 NVIDIA GPU（最低 6GB 显存）。
           </p>
           {videoModel && renderModelCard(videoModel, '视频生成')}
-          {!gpuInfo?.available && (
+          {!gpuInfo?.available && !envCheck?.gpu_detected && (
             <p className="warning-text">
               ⚠️ 未检测到 GPU，视频生成功能不可用。请安装 NVIDIA 驱动和 CUDA。
             </p>
