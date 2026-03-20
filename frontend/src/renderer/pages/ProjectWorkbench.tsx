@@ -237,6 +237,7 @@ export function ProjectWorkbench(): JSX.Element {
         <Link to={`/project/${id}/chars`}>角色管理</Link>
         <Link to={`/project/${id}/story`}>分镜编辑</Link>
         <Link to={`/project/${id}/preview`}>视频预览</Link>
+        <Link to={`/project/${id}/script-optimization`}>剧本优化</Link>
       </nav>
       <Link to="/" className="back-link">← 返回项目列表</Link>
     </div>

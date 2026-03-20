@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { PythonManager } from './python-manager'
@@ -72,6 +72,16 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  // 注册刷新快捷键
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.key === 'F5' || (input.control && input.key === 'r')) {
+      mainWindow.webContents.reload()
+    }
+    if (input.key === 'F12') {
+      mainWindow.webContents.toggleDevTools()
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

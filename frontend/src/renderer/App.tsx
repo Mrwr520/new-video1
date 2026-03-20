@@ -7,6 +7,7 @@ import { StoryboardPage } from './pages/StoryboardPage'
 import { VideoPreviewPage } from './pages/VideoPreviewPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ModelManagePage } from './pages/ModelManagePage'
+import { ScriptOptimizationView } from '../views/ScriptOptimizationView'
 
 export function App(): JSX.Element {
   return (
@@ -29,6 +30,9 @@ export function App(): JSX.Element {
 
         {/* 模型管理页 */}
         <Route path="/models" element={<ModelManagePage />} />
+
+        {/* 剧本迭代优化 */}
+        <Route path="/project/:id/script-optimization" element={<ScriptOptimizationView />} />
       </Routes>
     </HashRouter>
   )
