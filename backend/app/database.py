@@ -3,6 +3,8 @@
 import aiosqlite
 from pathlib import Path
 
+from app.models.script_optimization import OPTIMIZATION_SCHEMA_SQL, OPTIMIZATION_INDEXES_SQL
+
 # 默认数据库路径
 DEFAULT_DB_PATH = Path(__file__).parent.parent / "data" / "app.db"
 
@@ -89,6 +91,8 @@ async def init_db() -> None:
     conn = await get_connection()
     try:
         await conn.executescript(SCHEMA_SQL)
+        await conn.executescript(OPTIMIZATION_SCHEMA_SQL)
+        await conn.executescript(OPTIMIZATION_INDEXES_SQL)
         await conn.commit()
     finally:
         await conn.close()

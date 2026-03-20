@@ -199,6 +199,41 @@ export interface AppConfigUpdate {
   volcengine_app_id?: string
 }
 
+// 剧本优化相关类型
+export interface ScriptOptimizationVersion {
+  session_id: string
+  iteration: number
+  script: string
+  evaluation: {
+    total_score: number
+    dimension_scores: {
+      content_quality: number
+      structure: number
+      creativity: number
+      hotspot_relevance: number
+      technique_application: number
+    }
+    suggestions: string[]
+    timestamp: string
+  }
+  hotspots: Array<{
+    title: string
+    description: string
+    source: string
+    relevance_score: number
+    timestamp: string
+  }>
+  techniques: Array<{
+    name: string
+    description: string
+    example: string
+    category: string
+    source: string
+  }>
+  timestamp: string
+  is_final: boolean
+}
+
 // API 错误类型
 export class ApiError extends Error {
   constructor(
@@ -287,7 +322,7 @@ export interface InstallStatusResponse {
 export class ApiClient {
   private baseUrl: string
 
-  constructor(baseUrl: string = 'http://localhost:8000') {
+  constructor(baseUrl: string = 'http://127.0.0.1:8000') {
     this.baseUrl = baseUrl
   }
 
@@ -561,6 +596,55 @@ export class ApiClient {
   /** 查询安装进度 */
   async getInstallStatus(): Promise<InstallStatusResponse> {
     return this.request<InstallStatusResponse>('/api/environment/install-status')
+  }
+
+  // ----------------------------------------------------------
+  // 剧本迭代优化
+  // ----------------------------------------------------------
+
+  /** 启动剧本优化流程 */
+  async startScriptOptimization(data: {
+    initial_prompt: string
+    target_score?: number
+    max_iterations?: number
+  }): Promise<{ session_id: string; status: string; message: string }> {
+    return this.request<{ session_id: string; status: string; message: string }>(
+      '/api/script-optimization/start',
+      { method: 'POST', body: JSON.stringify(data) }
+    )
+  }
+
+  /** 查询优化会话状态 */
+  async getOptimizationStatus(sessionId: string): Promise<{
+    id: string
+    initial_prompt: string
+    target_score: number
+    max_iterations: number
+    status: string
+    created_at: string
+    completed_at: string | null
+  }> {
+    return this.request(`/api/script-optimization/${sessionId}/status`)
+  }
+
+  /** 获取优化会话的版本历史 */
+  async getOptimizationVersions(sessionId: string): Promise<{
+    session_id: string
+    versions: ScriptOptimizationVersion[]
+    total: number
+  }> {
+    return this.request(`/api/script-optimization/${sessionId}/versions`)
+  }
+
+  /** 获取特定迭代版本 */
+  async getOptimizationVersion(sessionId: string, iteration: number): Promise<ScriptOptimizationVersion> {
+    return this.request(`/api/script-optimization/${sessionId}/versions/${iteration}`)
+  }
+
+  /** 获取 WebSocket URL for 优化进度 */
+  getOptimizationWsUrl(sessionId: string): string {
+    const wsBase = this.baseUrl.replace(/^http/, 'ws')
+    return `${wsBase}/ws/script-optimization/${sessionId}`
   }
 }
 

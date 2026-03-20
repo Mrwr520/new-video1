@@ -18,6 +18,7 @@ from app.api.events import router as events_router
 from app.api.config import router as config_router
 from app.api.models import router as models_router
 from app.api.environment import router as environment_router
+from app.api.script_optimization import router as script_optimization_router
 from app.database import init_db
 
 
@@ -55,6 +56,7 @@ app.include_router(events_router)
 app.include_router(config_router)
 app.include_router(models_router)
 app.include_router(environment_router)
+app.include_router(script_optimization_router)
 
 # 挂载静态文件目录，提供项目资源访问（图片、音频、视频等）
 projects_dir = Path(__file__).parent.parent / "data" / "projects"
